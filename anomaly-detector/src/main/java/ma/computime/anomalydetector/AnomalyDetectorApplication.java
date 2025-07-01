@@ -1,4 +1,4 @@
-package ma.computime.anomaly_detector;
+package ma.computime.anomalydetector;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
