@@ -1,25 +1,32 @@
 // Emplacement : src/main/java/ma/computime/anomalydetector/controller/DataController.java
 package ma.computime.anomalydetector.controller;
 
-import ma.computime.anomalydetector.dto.AnomalieInfo; // <-- NOUVEL IMPORT
+// Imports des entités
 import ma.computime.anomalydetector.entity.Employe;
 import ma.computime.anomalydetector.entity.Pointage;
+// On a supprimé l'entité Anomalie car elle n'est plus gérée ici.
+
+// Imports des repositories
 import ma.computime.anomalydetector.repository.EmployeRepository;
 import ma.computime.anomalydetector.repository.PointageRepository;
-import ma.computime.anomalydetector.service.AnomalieDetectionService; // <-- NOUVEL IMPORT
+
+// Imports techniques de Spring
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat; // <-- NOUVEL IMPORT
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate; // <-- NOUVEL IMPORT
 import java.util.List;
 
+/**
+ * Ce contrôleur est responsable de l'exposition des données brutes de l'application,
+ * comme les informations sur les employés et leurs pointages.
+ * Il sert de point d'accès en lecture seule aux données de base.
+ */
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/data") // J'ai changé le préfixe à /api/data pour éviter les conflits et être plus clair
 public class DataController {
 
     @Autowired
@@ -28,17 +35,22 @@ public class DataController {
     @Autowired
     private PointageRepository pointageRepository;
 
-    // INJECTION DE NOTRE NOUVEAU SERVICE
-    @Autowired
-    private AnomalieDetectionService anomalieDetectionService;
+    // L'injection de AnomalieDetectionService a été supprimée.
 
-    // --- Endpoints existants pour la lecture des données brutes ---
-
+    /**
+     * Récupère la liste de tous les employés.
+     * @return Une liste d'objets Employe.
+     */
     @GetMapping("/employes")
     public List<Employe> getAllEmployes() {
         return employeRepository.findAll();
     }
 
+    /**
+     * Récupère les informations d'un employé spécifique en utilisant son badge.
+     * @param badge Le numéro de badge de l'employé.
+     * @return Un objet Employe si trouvé, sinon une erreur 404.
+     */
     @GetMapping("/employes/{badge}")
     public ResponseEntity<Employe> getEmployeByBadge(@PathVariable String badge) {
         return employeRepository.findByBadge(badge)
@@ -46,23 +58,16 @@ public class DataController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    /**
+     * Récupère la liste de tous les pointages (mouvements) pour un employé donné.
+     * @param badge Le numéro de badge de l'employé.
+     * @return Une liste d'objets Pointage.
+     */
     @GetMapping("/employes/{badge}/pointages")
     public List<Pointage> getPointagesByEmployeBadge(@PathVariable String badge) {
         return pointageRepository.findByBadgeEmploye(badge);
     }
     
-    // --- NOUVEL ENDPOINT POUR LA DÉTECTION D'ANOMALIES ---
-
-    /**
-     * Lance la détection des anomalies pour une journée spécifique.
-     * L'URL doit être au format YYYY-MM-DD.
-     * Exemple : GET http://localhost:8080/api/anomalies/2023-01-20
-     * @param jour La date pour laquelle effectuer la détection.
-     * @return Une liste des anomalies trouvées.
-     */
-    @GetMapping("/anomalies/{jour}")
-    public List<AnomalieInfo> detecterAnomalies(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate jour) {
-        return anomalieDetectionService.detecterAnomaliesPourTous(jour);
-    }
+    // L'ancien endpoint GET /anomalies/{jour} a été complètement supprimé
+    // car sa logique est maintenant dans AnomalieController.
 }
