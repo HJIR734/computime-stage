@@ -5,12 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Un simple objet pour transporter les informations sur une anomalie détectée.
- */
-@Data // Lombok: génère getters, setters, toString...
-@NoArgsConstructor // Lombok: génère un constructeur sans arguments
-@AllArgsConstructor // Lombok: génère un constructeur avec tous les arguments
+
+@Data 
+@NoArgsConstructor 
+@AllArgsConstructor 
 public class AnomalieInfo {
     private String typeAnomalie;
     private String message;

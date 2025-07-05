@@ -1,8 +1,9 @@
-// Dans ma/computime/anomalydetector/entity/Anomalie.java
+// FICHIER : Anomalie.java (Code Complet et Final)
 package ma.computime.anomalydetector.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -15,26 +16,34 @@ public class Anomalie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "employe_badge", referencedColumnName = "BADGE")
     private Employe employe;
 
     @Column(name = "jour_anomalie")
     private LocalDate jourAnomalie;
 
+    // --- CORRECTION CLÉ ---
+    // On utilise notre Enum Java et on dit à Hibernate de le traiter comme une chaîne
+    // pour qu'il corresponde au type ENUM de la base de données.
     @Enumerated(EnumType.STRING)
+    @Column(name = "type_anomalie")
     private TypeAnomalie typeAnomalie;
 
+    @Column(name = "message", length = 512)
     private String message;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "statut")
     private StatutAnomalie statut;
 
-    @Column(name = "date_creation")
+    @Column(name = "suggestion_correction")
+    private String suggestion;
+
+    @CreationTimestamp
+    @Column(name = "date_creation", updatable = false)
     private LocalDateTime dateCreation;
 
-    @Column(name = "suggestion_correction")
-    private String suggestion; // ex: "Ajouter pointage à 09:05" ou "Valider 2h sup"
-
-    // Plus tard, on ajoutera l'ID du manager qui a validé, etc.
+    @Column(name = "commentaire_validation")
+    private String commentaireValidation;
 }

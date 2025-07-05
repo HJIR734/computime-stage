@@ -1,0 +1,17 @@
+# Fichier requirements.txt nettoyé
+
+# Pour l'API web
+Flask
+
+# Pour la manipulation de données
+pandas
+
+# Pour le Machine Learning
+scikit-learn
+numpy
+
+# Pour la sauvegarde/chargement de modèles
+joblib
+
+# Pour la connexion à la base de données
+mysql-connector-python

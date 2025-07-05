@@ -1,87 +1,117 @@
 // Emplacement : src/main/java/ma/computime/anomalydetector/controller/AnomalieController.java
 package ma.computime.anomalydetector.controller;
 
+import ma.computime.anomalydetector.dto.AnomalieDto;
+import ma.computime.anomalydetector.dto.AnomalieMapper;
 import ma.computime.anomalydetector.entity.Anomalie;
 import ma.computime.anomalydetector.entity.StatutAnomalie;
 import ma.computime.anomalydetector.repository.AnomalieRepository;
 import ma.computime.anomalydetector.service.AnomalieDetectionService;
+import ma.computime.anomalydetector.service.AnomalieWorkflowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/anomalies") // Toutes les URLs de ce contrôleur commenceront par /api/anomalies
+@RequestMapping("/api/anomalies")
 public class AnomalieController {
 
+    // --- INJECTIONS DE DÉPENDANCES ---
+    // On garde toutes les dépendances nécessaires des deux anciens controllers.
     @Autowired
-    private AnomalieDetectionService anomalieService;
+    private AnomalieDetectionService anomalieDetectionService;
+
+    @Autowired
+    private AnomalieWorkflowService anomalieWorkflowService;
 
     @Autowired
     private AnomalieRepository anomalieRepository;
 
+    // --- PARTIE DÉTECTION ---
+
     /**
-     * Lance le scan de détection des anomalies pour une journée spécifique.
-     * C'est une action qui modifie l'état du système (crée des anomalies),
-     * donc on utilise une requête POST.
-     *
-     * @param jour La date au format YYYY-MM-DD.
-     * @return Une réponse de confirmation.
+     * DÉCLENCHE le scan de détection des anomalies pour une journée spécifique.
+     * Cette méthode ne renvoie qu'un message de succès.
      */
     @PostMapping("/detecter/{jour}")
     public ResponseEntity<String> declencherDetectionAnomalies(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate jour) {
-        
-        anomalieService.lancerDetectionPourTous(jour);
+        anomalieDetectionService.lancerDetectionPourTous(jour);
         return ResponseEntity.ok("Détection des anomalies lancée avec succès pour le " + jour);
     }
 
+    // --- PARTIE CONSULTATION ---
+
     /**
-     * Récupère la liste de toutes les anomalies qui sont actuellement en attente de validation.
-     * C'est le endpoint que le manager utilisera pour voir les tâches à traiter.
-     *
-     * @return Une liste d'objets Anomalie.
+     * CONSULTE la liste des anomalies qui sont actuellement en attente de validation.
+     * Renvoie une liste d'AnomalieDto pour une réponse API propre et concise.
      */
     @GetMapping("/en-attente")
-    public List<Anomalie> getAnomaliesEnAttente() {
-        return anomalieRepository.findAll()
-                .stream()
-                .filter(anomalie -> anomalie.getStatut() == StatutAnomalie.EN_ATTENTE)
+    public List<AnomalieDto> getAnomaliesEnAttente() {
+        List<Anomalie> anomaliesEnAttente = anomalieRepository.findByStatut(StatutAnomalie.EN_ATTENTE);
+        return anomaliesEnAttente.stream()
+                .map(AnomalieMapper::toAnomalieDto)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Récupère la liste de toutes les anomalies, quel que soit leur statut.
-     * Utile pour avoir un historique complet.
-     *
-     * @return Une liste de toutes les anomalies enregistrées.
+     * CONSULTE l'historique de toutes les anomalies, quel que soit leur statut.
+     * Renvoie une liste d'AnomalieDto.
      */
     @GetMapping("/historique")
-    public List<Anomalie> getToutesLesAnomalies() {
-        return anomalieRepository.findAll();
-    }
-    
-    // ===================================================================
-    // FUTURS ENDPOINTS POUR LE WORKFLOW DE VALIDATION
-    // ===================================================================
-    // Nous les implémenterons dans la prochaine étape.
-    
-    /*
-    @PostMapping("/{id}/valider")
-    public ResponseEntity<Anomalie> validerAnomalie(@PathVariable Long id) {
-        // Logique pour valider une anomalie
-        return null; 
+    public List<AnomalieDto> getToutesLesAnomalies() {
+        List<Anomalie> toutesLesAnomalies = anomalieRepository.findAll();
+        return toutesLesAnomalies.stream()
+                .map(AnomalieMapper::toAnomalieDto)
+                .collect(Collectors.toList());
     }
 
-    @PostMapping("/{id}/rejeter")
-    public ResponseEntity<Anomalie> rejeterAnomalie(@PathVariable Long id) {
-        // Logique pour rejeter une anomalie
-        return null;
+    // --- PARTIE WORKFLOW (VALIDATION / REJET) ---
+    // On utilise la version la plus robuste et la plus claire (avec if/else).
+
+    /**
+     * Endpoint pour VALIDER une anomalie.
+     * Attend un ID dans l'URL et un corps JSON avec un commentaire.
+     * Exemple de corps JSON : { "commentaire": "Validé par le manager." }
+     */
+    @PostMapping("/{id}/valider")
+    public ResponseEntity<?> validerAnomalie(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+        String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
+
+        Optional<Anomalie> resultat = anomalieWorkflowService.validerAnomalie(id, commentaire);
+
+        if (resultat.isPresent()) {
+            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
+        } else {
+            String messageErreur = "Anomalie non trouvée ou statut invalide pour l'ID : " + id;
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(messageErreur);
+        }
     }
-    */
-    // ===================================================================
+
+    /**
+     * Endpoint pour REJETER une anomalie.
+     * Attend un ID dans l'URL et un corps JSON avec un commentaire.
+     * Exemple de corps JSON : { "commentaire": "Ceci n'est pas une anomalie." }
+     */
+    @PostMapping("/{id}/rejeter")
+    public ResponseEntity<?> rejeterAnomalie(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+        String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
+
+        Optional<Anomalie> resultat = anomalieWorkflowService.rejeterAnomalie(id, commentaire);
+
+        if (resultat.isPresent()) {
+            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
+        } else {
+            String messageErreur = "Anomalie non trouvée ou statut invalide pour l'ID : " + id;
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(messageErreur);
+        }
+    }
 }
