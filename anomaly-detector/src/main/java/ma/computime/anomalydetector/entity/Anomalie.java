@@ -1,4 +1,4 @@
-// FICHIER : Anomalie.java (Code Complet et Final)
+// Emplacement : ma/computime/anomalydetector/entity/Anomalie.java
 package ma.computime.anomalydetector.entity;
 
 import jakarta.persistence.*;
@@ -6,6 +6,7 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime; // <-- Import ajouté
 
 @Entity
 @Table(name = "anomalie")
@@ -23,9 +24,6 @@ public class Anomalie {
     @Column(name = "jour_anomalie")
     private LocalDate jourAnomalie;
 
-    // --- CORRECTION CLÉ ---
-    // On utilise notre Enum Java et on dit à Hibernate de le traiter comme une chaîne
-    // pour qu'il corresponde au type ENUM de la base de données.
     @Enumerated(EnumType.STRING)
     @Column(name = "type_anomalie")
     private TypeAnomalie typeAnomalie;
@@ -37,7 +35,7 @@ public class Anomalie {
     @Column(name = "statut")
     private StatutAnomalie statut;
 
-    @Column(name = "suggestion_correction")
+    @Column(name = "suggestion_correction") // Champ texte pour l'affichage
     private String suggestion;
 
     @CreationTimestamp
@@ -46,4 +44,19 @@ public class Anomalie {
 
     @Column(name = "commentaire_validation")
     private String commentaireValidation;
+    
+    // --- NOUVEAUX CHAMPS AJOUTÉS ---
+
+    /**
+     * Stocke la valeur concrète de la suggestion (ex: l'heure '08:58')
+     * pour qu'elle soit facilement utilisable par la logique métier.
+     */
+    @Column(name = "valeur_suggestion")
+    private LocalTime valeurSuggestion;
+
+    /**
+     * Horodatage du moment où l'anomalie a été résolue (par validation ou rejet).
+     */
+    @Column(name = "date_resolution")
+    private LocalDateTime dateResolution;
 }

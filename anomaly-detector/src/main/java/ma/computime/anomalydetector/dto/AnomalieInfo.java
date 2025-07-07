@@ -14,4 +14,5 @@ public class AnomalieInfo {
     private String message;
     private String badgeEmploye;
     private String nomEmploye;
+    private String suggestion;
 }
