@@ -1,43 +1,53 @@
-// FICHIER : AnomalieWorkflowService.java (Nouveau Fichier)
-
+// Emplacement : src/main/java/ma/computime/anomalydetector/service/AnomalieWorkflowService.java
 package ma.computime.anomalydetector.service;
 
 import ma.computime.anomalydetector.entity.Anomalie;
 import ma.computime.anomalydetector.entity.StatutAnomalie;
 import ma.computime.anomalydetector.repository.AnomalieRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // <-- IMPORT IMPORTANT
+
+import java.time.LocalDateTime; // <-- IMPORT IMPORTANT
 import java.util.Optional;
 
 @Service
 public class AnomalieWorkflowService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AnomalieWorkflowService.class);
 
     @Autowired
     private AnomalieRepository anomalieRepository;
 
     /**
      * Valide une anomalie en changeant son statut à VALIDEE.
+     * Cette opération est transactionnelle : soit tout réussit, soit tout est annulé.
      * @param anomalieId L'ID de l'anomalie à valider.
      * @param commentaire Un commentaire optionnel de la part du validateur.
      * @return L'anomalie mise à jour si elle a été trouvée et était en attente.
      */
+    @Transactional // Garantit la cohérence des données
     public Optional<Anomalie> validerAnomalie(Long anomalieId, String commentaire) {
-        // 1. On cherche l'anomalie dans la base de données par son ID.
+        logger.info("Tentative de validation de l'anomalie ID : {}", anomalieId);
+        
         Optional<Anomalie> anomalieOpt = anomalieRepository.findById(anomalieId);
 
-        // 2. Si on la trouve ET qu'elle est bien en attente...
-        if (anomalieOpt.isPresent() && anomalieOpt.get().getStatut() == StatutAnomalie.EN_ATTENTE) {
-            Anomalie anomalieAValider = anomalieOpt.get();
-            // 3. On change son statut.
-            anomalieAValider.setStatut(StatutAnomalie.VALIDEE);
-            anomalieAValider.setCommentaireValidation(commentaire); // On ajoute le commentaire
-            // 4. On sauvegarde les changements dans la base.
-            Anomalie anomalieSauvegardee = anomalieRepository.save(anomalieAValider);
-            return Optional.of(anomalieSauvegardee);
+        if (anomalieOpt.isEmpty() || anomalieOpt.get().getStatut() != StatutAnomalie.EN_ATTENTE) {
+            logger.warn("Échec de la validation : Anomalie ID {} non trouvée ou déjà traitée.", anomalieId);
+            return Optional.empty();
         }
 
-        // 5. Si l'anomalie n'est pas trouvée ou n'est pas en attente, on ne retourne rien.
-        return Optional.empty();
+        Anomalie anomalieAValider = anomalieOpt.get();
+        anomalieAValider.setStatut(StatutAnomalie.VALIDEE);
+        anomalieAValider.setCommentaireValidation(commentaire);
+        anomalieAValider.setDateResolution(LocalDateTime.now()); // On enregistre quand elle a été traitée
+
+        Anomalie anomalieSauvegardee = anomalieRepository.save(anomalieAValider);
+        logger.info("Anomalie ID {} validée avec succès.", anomalieId);
+        
+        return Optional.of(anomalieSauvegardee);
     }
 
     /**
@@ -46,17 +56,25 @@ public class AnomalieWorkflowService {
      * @param commentaire Un commentaire optionnel expliquant le rejet.
      * @return L'anomalie mise à jour si elle a été trouvée et était en attente.
      */
+    @Transactional
     public Optional<Anomalie> rejeterAnomalie(Long anomalieId, String commentaire) {
+        logger.info("Tentative de rejet de l'anomalie ID : {}", anomalieId);
+
         Optional<Anomalie> anomalieOpt = anomalieRepository.findById(anomalieId);
 
-        if (anomalieOpt.isPresent() && anomalieOpt.get().getStatut() == StatutAnomalie.EN_ATTENTE) {
-            Anomalie anomalieARejeter = anomalieOpt.get();
-            anomalieARejeter.setStatut(StatutAnomalie.REJETEE);
-            anomalieARejeter.setCommentaireValidation(commentaire);
-            Anomalie anomalieSauvegardee = anomalieRepository.save(anomalieARejeter);
-            return Optional.of(anomalieSauvegardee);
+        if (anomalieOpt.isEmpty() || anomalieOpt.get().getStatut() != StatutAnomalie.EN_ATTENTE) {
+            logger.warn("Échec du rejet : Anomalie ID {} non trouvée ou déjà traitée.", anomalieId);
+            return Optional.empty();
         }
 
-        return Optional.empty();
+        Anomalie anomalieARejeter = anomalieOpt.get();
+        anomalieARejeter.setStatut(StatutAnomalie.REJETEE);
+        anomalieARejeter.setCommentaireValidation(commentaire);
+        anomalieARejeter.setDateResolution(LocalDateTime.now());
+
+        Anomalie anomalieSauvegardee = anomalieRepository.save(anomalieARejeter);
+        logger.info("Anomalie ID {} rejetée avec succès.", anomalieId);
+        
+        return Optional.of(anomalieSauvegardee);
     }
 }

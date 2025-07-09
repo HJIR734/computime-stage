@@ -1,3 +1,4 @@
+// Emplacement : ma/computime/anomalydetector/dto/PredictionRequest.java
 package ma.computime.anomalydetector.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -19,7 +20,9 @@ public class PredictionRequest {
     @JsonProperty("mois")
     private int mois;
     
-    // LA DERNIÈRE CORRECTION !
     @JsonProperty("semaine_de_annee")
     private int semaineDeAnnee;
+    
+    @JsonProperty("badge") // <-- NOUVEAU CHAMP AJOUTÉ
+    private String badge;
 }
