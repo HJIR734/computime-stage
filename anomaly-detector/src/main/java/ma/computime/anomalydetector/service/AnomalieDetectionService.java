@@ -1,4 +1,4 @@
-// Emplacement : ma/computime/anomalydetector/service/AnomalieDetectionService.java
+// Emplacement : src/main/java/ma/computime/anomalydetector/service/AnomalieDetectionService.java
 package ma.computime.anomalydetector.service;
 
 import ma.computime.anomalydetector.dto.IaSuggestionResponse;
@@ -13,11 +13,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient; // On n'utilise plus que RestClient
+import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,97 +34,158 @@ public class AnomalieDetectionService {
     @Autowired private PointageRepository pointageRepository;
     @Autowired private AnomalieRepository anomalieRepository;
     @Autowired private JourFerieRepository jourFerieRepository;
-    
-    // On n'a plus besoin de RestTemplate, on le supprime
-    // @Autowired private RestTemplate restTemplate; 
-    @Autowired private RestClient restClient; // On utilise uniquement le RestClient
+    @Autowired private RestClient restClient;
 
     public void lancerDetectionPourTous(LocalDate jour) {
         logger.info("Lancement de la détection des anomalies pour le jour : {}", jour);
         List<Employe> employes = employeRepository.findAll();
-        for (Employe employe : employes) {
-            List<Pointage> pointagesDuJour = pointageRepository.findByBadgeEmploye(employe.getBadge())
-                    .stream()
-                    .filter(p -> p.getDateMouvement().toLocalDate().equals(jour))
-                    .sorted(Comparator.comparing(Pointage::getDateMouvement))
-                    .collect(Collectors.toList());
 
-            if (!pointagesDuJour.isEmpty()) {
-                boolean anomalieJourNonTravailleTrouvee = detecterTravailJourNonTravaille(employe, jour);
-                if (anomalieJourNonTravailleTrouvee) {
-                    continue;
-                }
-            } else {
+        for (Employe employe : employes) {
+            List<Pointage> pointagesDuJour = pointageRepository.findByBadgeEmployeAndDateMouvementBetween(
+                    employe.getBadge(),
+                    jour.atStartOfDay(),
+                    jour.plusDays(1).atStartOfDay()
+            ).stream()
+             .sorted(Comparator.comparing(Pointage::getDateMouvement))
+             .collect(Collectors.toList());
+
+            // --- NOUVELLE LOGIQUE : ON VÉRIFIE L'ABSENCE EN PREMIER ---
+            if (pointagesDuJour.isEmpty()) {
+                detecterAbsenceInjustifiee(employe, jour);
+                continue; // On passe à l'employé suivant, rien d'autre à vérifier.
+            }
+            
+            // Le reste ne s'exécute que s'il y a eu des pointages.
+            boolean estUnJourOff = detecterTravailJourNonTravaille(employe, jour);
+            if (estUnJourOff) {
                 continue;
             }
 
-            boolean aUneOmission = pointagesDuJour.size() % 2 != 0;
+            Planning planning = employe.getPlanning();
+            if (planning == null) {
+                logger.warn("L'employé avec badge {} n'a pas de planning affecté. Impossible de détecter les retards/HS.", employe.getBadge());
+                continue;
+            }
 
+            Optional<Horaire> horaireDuJourOpt = planning.getHorairePourJour(jour.getDayOfWeek());
+
+            boolean aUneOmission = pointagesDuJour.size() % 2 != 0;
             if (aUneOmission) {
-                // APPEL À LA MÉTHODE CORRIGÉE
                 detecterOmissionAvecIA(employe, jour, pointagesDuJour);
-            } else {
-                Planning planning = employe.getPlanning();
-                if (planning == null) {
-                    logger.warn("L'employé avec badge {} n'a pas de planning affecté. Impossible de détecter les retards/HS.", employe.getBadge());
-                    continue;
-                }
-                Optional<Horaire> horaireDuJourOpt = planning.getHorairePourJour(jour.getDayOfWeek());
-                if (horaireDuJourOpt.isPresent()) {
-                    Horaire horaireDuJour = horaireDuJourOpt.get();
-                    // On peut ajouter la détection de retard ici si on veut
-                    // detecterRetard(employe, jour, pointagesDuJour, horaireDuJour);
-                    detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, horaireDuJour);
-                }
+            } else if (horaireDuJourOpt.isPresent()) {
+                Horaire horaireDuJour = horaireDuJourOpt.get();
+                
+                detecterRetard(employe, jour, pointagesDuJour, horaireDuJour);
+                detecterSortieAnticipee(employe, jour, pointagesDuJour, horaireDuJour);
+                detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, horaireDuJour);
             }
         }
         logger.info("Détection des anomalies terminée pour le jour : {}", jour);
     }
+
+    // =========================================================================
+    // === NOUVELLE MÉTHODE : DÉTECTION D'ABSENCE INJUSTIFIÉE ==================
+    // =========================================================================
+    private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour) {
+        // On vérifie s'il était censé travailler ce jour-là.
+        Planning planning = employe.getPlanning();
+        boolean devaitTravailler = planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isPresent();
+        
+        // On vérifie aussi si ce n'est pas un jour férié.
+        boolean estFerie = jourFerieRepository.existsByDate(jour);
+        
+        // La condition : il devait travailler ET ce n'était pas un jour férié.
+        if (devaitTravailler && !estFerie) {
+            // Ici, on pourrait ajouter une vérification pour voir si une demande de congé a été validée.
+            // Pour l'instant, on garde la logique simple.
+            
+            logger.info("Absence injustifiée détectée pour le badge {} le {}.", employe.getBadge(), jour);
+            String message = "Aucun pointage détecté pour une journée de travail planifiée.";
+            creerEtSauverAnomalie(employe, jour, TypeAnomalie.ABSENCE_INJUSTIFIEE, message, "Absence à justifier ou à déclarer.", null);
+        }
+    }
     
-    // =========================================================================
-    // === MÉTHODE D'OMISSION CORRIGÉE POUR UTILISER RESTCLIENT ET MAP =========
-    // =========================================================================
+    // --- Les autres méthodes de détection, maintenant propres ---
+    
+    private void detecterRetard(Employe employe, LocalDate jour, List<Pointage> pointagesDuJour, Horaire horaireDuJour) {
+        LocalTime heureDebutTheorique = horaireDuJour.getHeureDebutTheorique();
+        if (heureDebutTheorique == null) {
+            return;
+        }
+
+        Pointage premierPointage = pointagesDuJour.get(0);
+        LocalTime heurePremierPointage = premierPointage.getDateMouvement().toLocalTime();
+        int toleranceEnMinutes = 0;
+        
+        if (heurePremierPointage.isAfter(heureDebutTheorique.plusMinutes(toleranceEnMinutes))) {
+            long dureeRetardMinutes = ChronoUnit.MINUTES.between(heureDebutTheorique, heurePremierPointage);
+            logger.info("Retard détecté pour le badge {}. Durée: {} minutes. Appel de l'IA...", employe.getBadge(), dureeRetardMinutes);
+            String message = String.format("Arrivée à %s au lieu de %s. Retard de %d minutes.", heurePremierPointage.format(DateTimeFormatter.ofPattern("HH:mm")), heureDebutTheorique.format(DateTimeFormatter.ofPattern("HH:mm")), dureeRetardMinutes);
+            String suggestionTexte = "Validation manuelle requise.";
+            try {
+                Map<String, Object> requestBody = new HashMap<>();
+                requestBody.put("badge", employe.getBadge());
+                requestBody.put("jour_semaine", jour.getDayOfWeek().getValue() - 1);
+                requestBody.put("duree_retard_minutes", dureeRetardMinutes);
+                IaSuggestionResponse suggestion = restClient.post().uri("/predict/retard").contentType(MediaType.APPLICATION_JSON).body(requestBody).retrieve().body(IaSuggestionResponse.class);
+                if (suggestion != null) {
+                    suggestionTexte = String.format("Suggestion IA : %s (Confiance : %s)", suggestion.getDecision(), suggestion.getConfiance());
+                }
+            } catch (Exception e) {
+                suggestionTexte = "Suggestion non disponible (IA injoignable)";
+            }
+            creerEtSauverAnomalie(employe, jour, TypeAnomalie.RETARD, message, suggestionTexte, null);
+        }
+    }
+
+    private void detecterSortieAnticipee(Employe employe, LocalDate jour, List<Pointage> pointagesDuJour, Horaire horaireDuJour) {
+        LocalTime heureDebutTheorique = horaireDuJour.getHeureDebutTheorique();
+        LocalTime heureFinTheorique = horaireDuJour.getHeureFinTheorique();
+
+        if (heureFinTheorique == null) {
+            return;
+        }
+        if (heureDebutTheorique != null && heureFinTheorique.isBefore(heureDebutTheorique)) {
+            logger.warn("Horaire incohérent (fin avant début) pour le badge {} le {}. Détection de sortie anticipée annulée.", employe.getBadge(), jour);
+            return;
+        }
+        
+        Pointage dernierPointage = pointagesDuJour.get(pointagesDuJour.size() - 1);
+        LocalTime heureDernierPointage = dernierPointage.getDateMouvement().toLocalTime();
+        int toleranceEnMinutes = 0;
+        
+        if (heureDernierPointage.isBefore(heureFinTheorique.minusMinutes(toleranceEnMinutes))) {
+            long dureeAnticipationMinutes = ChronoUnit.MINUTES.between(heureDernierPointage, heureFinTheorique);
+            logger.info("Sortie anticipée détectée pour le badge {}. Durée: {} minutes.", employe.getBadge(), dureeAnticipationMinutes);
+            String message = String.format("Sortie à %s au lieu de %s. Départ anticipé de %d minutes.", heureDernierPointage.format(DateTimeFormatter.ofPattern("HH:mm")), heureFinTheorique.format(DateTimeFormatter.ofPattern("HH:mm")), dureeAnticipationMinutes);
+            creerEtSauverAnomalie(employe, jour, TypeAnomalie.SORTIE_ANTICIPEE, message, "Justification requise.", null);
+        }
+    }
+    
     private void detecterOmissionAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages) {
         String message = "Nombre de pointages impair détecté (" + pointages.size() + " pointages).";
         String suggestionTexte = "Validation manuelle requise.";
         LocalTime suggestionHeure = null;
-
         try {
             logger.info("Tentative d'appel à l'IA pour l'omission du badge {} le {}", employe.getBadge(), jour);
-            
-            // On utilise une Map pour être sûr que les noms des clés JSON sont corrects
             Map<String, Object> requestBody = new HashMap<>();
             WeekFields weekFields = WeekFields.of(Locale.getDefault());
-            
-            requestBody.put("jour_de_semaine", jour.getDayOfWeek().getValue()); // 1 pour Lundi, 7 pour Dimanche
+            requestBody.put("jour_de_semaine", jour.getDayOfWeek().getValue());
             requestBody.put("jour_du_mois", jour.getDayOfMonth());
             requestBody.put("mois", jour.getMonthValue());
             requestBody.put("semaine_de_annee", jour.get(weekFields.weekOfWeekBasedYear()));
             requestBody.put("badge", employe.getBadge());
-            
-            // On utilise le RestClient (comme pour les heures sup)
-            PredictionResponse response = restClient.post()
-                    .uri("/predict/entree") // L'URL est correcte
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(PredictionResponse.class);
-
+            PredictionResponse response = restClient.post().uri("/predict/entree").contentType(MediaType.APPLICATION_JSON).body(requestBody).retrieve().body(PredictionResponse.class);
             if (response != null && response.getSuggestionHeure() != null && !response.getSuggestionHeure().isEmpty()) {
                 suggestionTexte = "Suggestion IA: " + response.getSuggestionHeure();
                 suggestionHeure = LocalTime.parse(response.getSuggestionHeure());
-                logger.info("Suggestion de l'IA reçue pour l'omission du badge {}: {}", employe.getBadge(), suggestionTexte);
             }
         } catch (Exception e) {
-            logger.error("Erreur de communication avec le service de prédiction IA pour l'omission. Message: {}", e.getMessage());
             suggestionTexte = "Suggestion non disponible (IA injoignable)";
         }
-        
         creerEtSauverAnomalie(employe, jour, TypeAnomalie.OMISSION_POINTAGE, message, suggestionTexte, suggestionHeure);
     }
-
-
-    // Le reste du code ne change pas
+    
     private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour) {
         if (jourFerieRepository.existsByDate(jour)) {
             creerEtSauverAnomalie(employe, jour, TypeAnomalie.TRAVAIL_JOUR_FERIE, "Pointages détectés un jour férié (" + jour + ").", "Vérifier compensation.", null);
@@ -137,11 +201,13 @@ public class AnomalieDetectionService {
 
     private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire) {
         if (pointages.size() < 2) return;
+        LocalTime heureDebutTheorique = horaire.getHeureDebutTheorique();
+        LocalTime heureFinTheorique = horaire.getHeureFinTheorique();
+        if (heureDebutTheorique == null || heureFinTheorique == null) return;
         Pointage premierPointage = pointages.get(0);
         Pointage dernierPointage = pointages.get(pointages.size() - 1);
         long dureeTravailleeSecondes = Duration.between(premierPointage.getDateMouvement(), dernierPointage.getDateMouvement()).toSeconds();
-        long dureeTheoriqueSecondes = Duration.between(horaire.getHeureDebutTheorique(), horaire.getHeureFinTheorique()).getSeconds();
-
+        long dureeTheoriqueSecondes = Duration.between(heureDebutTheorique, heureFinTheorique).getSeconds();
         if (dureeTravailleeSecondes > dureeTheoriqueSecondes) {
             long hsSecondes = dureeTravailleeSecondes - dureeTheoriqueSecondes;
             if (hsSecondes / 60 > 0) {
@@ -155,10 +221,8 @@ public class AnomalieDetectionService {
                     IaSuggestionResponse suggestion = restClient.post().uri("/predict/overtime").contentType(MediaType.APPLICATION_JSON).body(requestBody).retrieve().body(IaSuggestionResponse.class);
                     if (suggestion != null) {
                         suggestionTexte = String.format("Suggestion IA : %s (Confiance : %s)", suggestion.getDecision(), suggestion.getConfiance());
-                        logger.info("Suggestion de l'IA reçue pour l'heure sup du badge {}: {}", employe.getBadge(), suggestionTexte);
                     }
                 } catch (Exception e) {
-                    logger.error("Erreur de communication avec le service de prédiction HS de l'IA. Message: {}", e.getMessage());
                     suggestionTexte = "Suggestion non disponible (IA injoignable)";
                 }
                 creerEtSauverAnomalie(employe, jour, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, String.format("Heure supplémentaire de %d minutes détectée.", hsSecondes / 60), suggestionTexte, null);

@@ -2,6 +2,7 @@ package ma.computime.anomalydetector.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.persistence.FetchType;
 import lombok.Data;
 import java.time.LocalTime;
 import java.util.Comparator;
