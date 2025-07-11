@@ -22,7 +22,13 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
-import java.util.*;
+import java.util.ArrayList; // Utilisé implicitement, mais bon à avoir
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List; // <-- L'IMPORT MANQUANT EST PROBABLEMENT CELUI-CI
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,7 +44,7 @@ public class AnomalieDetectionService {
 
     public void lancerDetectionPourTous(LocalDate jour) {
         logger.info("Lancement de la détection des anomalies pour le jour : {}", jour);
-        List<Employe> employes = employeRepository.findAll();
+        List<Employe> employes = employeRepository.findAllWithManagers();
 
         for (Employe employe : employes) {
             List<Pointage> pointagesDuJour = pointageRepository.findByBadgeEmployeAndDateMouvementBetween(
@@ -232,6 +238,10 @@ public class AnomalieDetectionService {
         }
         Anomalie anomalie = new Anomalie();
         anomalie.setEmploye(employe);
+        Employe manager = employe.getManager();
+        if (manager != null) {
+            anomalie.setManagerAssigne(manager);
+        }
         anomalie.setJourAnomalie(jour);
         anomalie.setTypeAnomalie(type);
         anomalie.setMessage(message);
@@ -239,6 +249,6 @@ public class AnomalieDetectionService {
         anomalie.setValeurSuggestion(valeurSuggestion);
         anomalie.setStatut(StatutAnomalie.EN_ATTENTE);
         anomalieRepository.save(anomalie);
-        logger.info("Anomalie de type {} créée pour l'employé {}.", type, employe.getBadge());
+        logger.info("Anomalie de type {} créée pour l'employé {}. Assignée au manager ID: {}.", type, employe.getBadge(), (manager != null ? manager.getId() : "aucun"));
     }
 }

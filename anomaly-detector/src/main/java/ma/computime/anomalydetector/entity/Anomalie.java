@@ -6,7 +6,7 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime; // <-- Import ajouté
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "anomalie")
@@ -20,6 +20,12 @@ public class Anomalie {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "employe_badge", referencedColumnName = "BADGE")
     private Employe employe;
+
+    // --- NOUVEAU CHAMP AJOUTÉ : Le manager responsable de la validation ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_assigne_fk", referencedColumnName = "ID", nullable = true)
+    private Employe managerAssigne;
+    // ----------------------------------------------------------------------
 
     @Column(name = "jour_anomalie")
     private LocalDate jourAnomalie;
@@ -35,7 +41,7 @@ public class Anomalie {
     @Column(name = "statut")
     private StatutAnomalie statut;
 
-    @Column(name = "suggestion_correction") // Champ texte pour l'affichage
+    @Column(name = "suggestion_correction")
     private String suggestion;
 
     @CreationTimestamp
@@ -45,18 +51,9 @@ public class Anomalie {
     @Column(name = "commentaire_validation")
     private String commentaireValidation;
     
-    // --- NOUVEAUX CHAMPS AJOUTÉS ---
-
-    /**
-     * Stocke la valeur concrète de la suggestion (ex: l'heure '08:58')
-     * pour qu'elle soit facilement utilisable par la logique métier.
-     */
     @Column(name = "valeur_suggestion")
     private LocalTime valeurSuggestion;
 
-    /**
-     * Horodatage du moment où l'anomalie a été résolue (par validation ou rejet).
-     */
     @Column(name = "date_resolution")
     private LocalDateTime dateResolution;
 }
