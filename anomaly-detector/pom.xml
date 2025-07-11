@@ -1,42 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.5</version> <!-- ou la version que tu as choisie -->
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
+
     <groupId>ma.computime</groupId>
     <artifactId>anomaly-detector</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>anomaly-detector</name>
     <description>Microservice for HR anomaly detection</description>
-    <properties>
-        <java.version>17</java.version> <!-- ou 21 -->
-    </properties>
-    <dependencies>
 
+    <properties>
+        <java.version>17</java.version> <!-- ou 21 si tu utilises Java 21 -->
+    </properties>
+
+    <dependencies>
+        <!-- Monitoring et production info -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-
-        <!-- Pour créer des API REST -->
+        <!-- API REST -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Pour la connexion à la base de données (JPA) -->
+        <!-- Thymeleaf (moteur de templates pour frontend HTML) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- JPA / Hibernate pour base de données -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- Pour que l'application redémarre seule lors des modifications -->
+        <!-- Devtools pour rechargement automatique -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
@@ -44,27 +55,26 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Pilote pour la base de données MySQL -->
+        <!-- MySQL JDBC driver -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Pour simplifier le code (getters, setters...) -->
+        <!-- Lombok (simplifie le code Java) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Pour les tests -->
+        <!-- Pour les tests unitaires -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>

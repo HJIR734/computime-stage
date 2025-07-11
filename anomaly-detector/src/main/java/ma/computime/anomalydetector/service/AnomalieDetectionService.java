@@ -22,13 +22,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
-import java.util.ArrayList; // Utilisé implicitement, mais bon à avoir
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List; // <-- L'IMPORT MANQUANT EST PROBABLEMENT CELUI-CI
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,7 +38,8 @@ public class AnomalieDetectionService {
 
     public void lancerDetectionPourTous(LocalDate jour) {
         logger.info("Lancement de la détection des anomalies pour le jour : {}", jour);
-        List<Employe> employes = employeRepository.findAllWithManagers();
+        
+        List<Employe> employes = employeRepository.findAll();
 
         for (Employe employe : employes) {
             List<Pointage> pointagesDuJour = pointageRepository.findByBadgeEmployeAndDateMouvementBetween(
@@ -98,7 +93,6 @@ public class AnomalieDetectionService {
         }
     }
     
-    // --- MÉTHODE DE DÉTECTION DE RETARD MISE À JOUR ---
     private void detecterRetard(Employe employe, LocalDate jour, List<Pointage> pointagesDuJour, Horaire horaireDuJour) {
         LocalTime heureDebutTheorique = horaireDuJour.getHeureDebutTheorique();
         if (heureDebutTheorique == null) return;
@@ -113,13 +107,11 @@ public class AnomalieDetectionService {
             String message = String.format("Arrivée à %s au lieu de %s. Retard de %d minutes.", heurePremierPointage.format(DateTimeFormatter.ofPattern("HH:mm")), heureDebutTheorique.format(DateTimeFormatter.ofPattern("HH:mm")), dureeRetardMinutes);
             String suggestionTexte = "Validation manuelle requise.";
             try {
-                // On prépare le corps de la requête avec toutes les features nécessaires au modèle
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("badge", employe.getBadge());
                 requestBody.put("jour_semaine", jour.getDayOfWeek().getValue() - 1);
                 requestBody.put("duree_retard_minutes", dureeRetardMinutes);
                 
-                // On ajoute les features utilisées par le modèle entraîné
                 if (employe.getPlanning() != null) {
                     requestBody.put("PLANNING_FK", employe.getPlanning().getId());
                 } else {
@@ -161,8 +153,6 @@ public class AnomalieDetectionService {
         }
     }
     
-    // ... Le reste de tes méthodes reste identique ...
-
     private void detecterOmissionAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages) {
         String message = "Nombre de pointages impair détecté (" + pointages.size() + " pointages).";
         String suggestionTexte = "Validation manuelle requise.";
@@ -230,18 +220,24 @@ public class AnomalieDetectionService {
             }
         }
     }
-
+    
+    // --- MÉTHODE MODIFIÉE AVEC LOGS DE DÉBOGAGE ---
     private void creerEtSauverAnomalie(Employe employe, LocalDate jour, TypeAnomalie type, String message, String suggestionTexte, LocalTime valeurSuggestion) {
         if (anomalieRepository.existsByEmployeAndJourAnomalieAndTypeAnomalie(employe, jour, type)) {
-            logger.warn("Une anomalie de type {} existe déjà pour l'employé {} le {}. Ignorée.", type, employe.getBadge(), jour);
+            logger.warn("DUPLICATA: Anomalie de type {} existe déjà pour l'employé {} le {}. Ignorée.", type, employe.getBadge(), jour);
             return;
         }
+        
         Anomalie anomalie = new Anomalie();
         anomalie.setEmploye(employe);
-        Employe manager = employe.getManager();
-        if (manager != null) {
-            anomalie.setManagerAssigne(manager);
+        
+        if (employe.getNoeud() != null) {
+            anomalie.setNoeudConcerne(employe.getNoeud());
+            logger.info("Anomalie pour l'employé {} assignée au noeud ID {}.", employe.getBadge(), employe.getNoeud().getId());
+        } else {
+             logger.warn("L'employé {} n'est assigné à aucun noeud. L'anomalie ne sera pas assignée.", employe.getBadge());
         }
+        
         anomalie.setJourAnomalie(jour);
         anomalie.setTypeAnomalie(type);
         anomalie.setMessage(message);
@@ -249,6 +245,7 @@ public class AnomalieDetectionService {
         anomalie.setValeurSuggestion(valeurSuggestion);
         anomalie.setStatut(StatutAnomalie.EN_ATTENTE);
         anomalieRepository.save(anomalie);
-        logger.info("Anomalie de type {} créée pour l'employé {}. Assignée au manager ID: {}.", type, employe.getBadge(), (manager != null ? manager.getId() : "aucun"));
+        
+        logger.info("Anomalie sauvegardée pour l'employé {}.", employe.getBadge());
     }
 }

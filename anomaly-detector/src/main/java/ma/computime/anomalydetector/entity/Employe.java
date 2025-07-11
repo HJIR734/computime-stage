@@ -6,8 +6,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.hibernate.annotations.NotFound; 
-import org.hibernate.annotations.NotFoundAction;
 
 @Entity
 @Table(name = "utilisateur")
@@ -35,16 +33,16 @@ public class Employe {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "PLANNING_FK")
-    @JsonIgnore // On garde JsonIgnore ici, car on ne veut pas charger le planning entier avec l'employé
+    @JsonIgnore
     private Planning planning;
 
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "NOEUD_FK")
-    @NotFound(action = NotFoundAction.IGNORE)
     @JsonIgnore
-    private Employe manager;
+    private Noeud noeud;
 
     @OneToMany(mappedBy = "employe", fetch = FetchType.LAZY)
-    @JsonManagedReference("employe-pointage") // Nom unique pour la référence
+    @JsonManagedReference("employe-pointage")
     private List<Pointage> pointages;
 }

@@ -14,7 +14,8 @@ public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
     List<Anomalie> findByStatut(StatutAnomalie statut);
 
     // --- NOUVELLE MÉTHODE AJOUTÉE : Filtrer par manager et statut ---
-    List<Anomalie> findByManagerAssigneIdAndStatut(Integer managerId, StatutAnomalie statut);
+    List<Anomalie> findByNoeudConcerneIdAndStatut(Integer noeudId, StatutAnomalie statut);
 
     boolean existsByEmployeAndJourAnomalieAndTypeAnomalie(Employe employe, LocalDate jourAnomalie, TypeAnomalie typeAnomalie);
+    List<Anomalie> findByNoeudConcerneIdAndStatutNot(Integer noeudId, StatutAnomalie statut);
 }

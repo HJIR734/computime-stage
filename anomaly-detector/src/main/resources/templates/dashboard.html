@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Tableau de Bord des Anomalies</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card-header { font-weight: bold; }
+        .form-text { font-size: 0.8em; }
+        .action-group .btn { margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container my-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">Tableau de Bord - Service <span class="text-primary" th:text="${noeudId}"></span></h1>
+            <a href="#" class="btn btn-outline-secondary btn-sm" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> Rafraîchir</a>
+        </div>
+
+        <!-- Section des Anomalies à Traiter -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-exclamation-triangle-fill"></i> Anomalies en Attente de Validation
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${anomalies.isEmpty()}" class="alert alert-success m-3">
+                    Félicitations, aucune anomalie en attente !
+                </div>
+                <table class="table table-hover align-middle mb-0" th:unless="${anomalies.isEmpty()}">
+                    <thead>
+                        <tr>
+                            <th>Employé</th>
+                            <th>Type</th>
+                            <th>Détails</th>
+                            <th style="width: 45%;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="anomalie : ${anomalies}">
+                            <td>
+                                <strong th:text="${anomalie.employe.prenom} + ' ' + ${anomalie.employe.nom}"></strong><br>
+                                <small class="text-muted" th:text="'Badge: ' + ${anomalie.employe.badge}"></small>
+                            </td>
+                            <td><span class="badge bg-danger" th:text="${anomalie.typeAnomalie}"></span></td>
+                            <td th:text="${anomalie.message}"></td>
+                            <td>
+                                <!-- Actions pour OMISSION_POINTAGE -->
+                                <form th:if="${anomalie.typeAnomalie.name() == 'OMISSION_POINTAGE'}" onsubmit="handleFormSubmit(event)">
+                                    <input type="hidden" name="actionUrl" th:value="@{/api/anomalies/{id}/corriger-manuellement(id=${anomalie.id})}">
+                                    <div class="input-group input-group-sm">
+                                        <input type="time" class="form-control" name="heureCorrigee" required title="Heure de pointage manquante">
+                                        <input type="text" class="form-control" name="commentaire" placeholder="Commentaire...">
+                                        <button type="submit" class="btn btn-warning"><i class="bi bi-pencil-fill"></i> Corriger</button>
+                                    </div>
+                                    <div th:if="${anomalie.suggestion != null}" class="form-text mt-1">
+                                        <i class="bi bi-lightbulb-fill text-primary"></i> Suggestion IA : <strong th:text="${anomalie.suggestion}"></strong>
+                                    </div>
+                                </form>
+
+                                <!-- Actions pour ABSENCE_INJUSTIFIEE -->
+                                <div class="action-group" th:if="${anomalie.typeAnomalie.name() == 'ABSENCE_INJUSTIFIEE'}">
+                                    <button type="button" class="btn btn-info btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider(id=${anomalie.id})}', 'Requalifiée en Absence justifiée.')|">
+                                        <i class="bi bi-journal-check"></i> Requalifier
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter(id=${anomalie.id})}', 'Confirmée comme Absence Injustifiée.')|">
+                                        <i class="bi bi-hand-thumbs-down"></i> Confirmer Absence
+                                    </button>
+                                </div>
+
+                                <!-- Actions génériques pour les autres (RETARD, SORTIE_ANTICIPEE, HEURE_SUP...) -->
+                                <div class="action-group" th:if="${anomalie.typeAnomalie.name() != 'OMISSION_POINTAGE' && anomalie.typeAnomalie.name() != 'ABSENCE_INJUSTIFIEE'}">
+                                    <button type="button" class="btn btn-success btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider(id=${anomalie.id})}', 'Validé par manager.')|">
+                                        <i class="bi bi-check-lg"></i> Valider
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter(id=${anomalie.id})}', 'Rejeté par manager.')|">
+                                        <i class="bi bi-x-lg"></i> Rejeter
+                                    </button>
+                                    <div th:if="${anomalie.suggestion != null}" class="form-text mt-1">
+                                        <i class="bi bi-lightbulb-fill text-primary"></i> <span th:text="${anomalie.suggestion}"></span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section de l'Historique -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-clock-history"></i> Historique Récent
+            </div>
+            <div class="card-body p-0">
+                 <div th:if="${historique.isEmpty()}" class="alert alert-light m-3">
+                    Aucune action enregistrée récemment.
+                </div>
+                <table class="table table-sm table-striped mb-0" th:unless="${historique.isEmpty()}">
+                    <thead><tr><th>ID</th><th>Employé</th><th>Type</th><th>Statut</th><th>Commentaire</th></tr></thead>
+                    <tbody>
+                        <tr th:each="h : ${historique}" th:classappend="${h.statut.name() == 'VALIDEE' || h.statut.name() == 'RESOLUE' ? 'table-light' : 'table-light'}">
+                            <td th:text="${h.id}"></td>
+                            <td th:text="${h.employe.nom}"></td>
+                            <td th:text="${h.typeAnomalie}"></td>
+                            <td>
+                                <span th:if="${h.statut.name() == 'VALIDEE' || h.statut.name() == 'RESOLUE'}" class="badge bg-success" th:text="${h.statut}"></span>
+                                <span th:if="${h.statut.name() == 'REJETEE'}" class="badge bg-danger" th:text="${h.statut}"></span>
+                            </td>
+                            <td th:text="${h.commentaireValidation}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Le script JavaScript qui gère toutes les actions -->
+    <script>
+        // Fonction pour les actions simples (Valider, Rejeter, Requalifier)
+        function simpleAction(button, url, commentaire) {
+            button.disabled = true; // Empêche le double-clic
+            const body = { commentaire: commentaire };
+            
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(handleResponse);
+        }
+
+        // Fonction pour le formulaire de correction (Omission)
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            form.querySelector('button').disabled = true;
+            
+            const url = form.querySelector('input[name=actionUrl]').value;
+            const body = {
+                heureCorrigee: form.querySelector('input[name=heureCorrigee]').value,
+                commentaire: form.querySelector('input[name=commentaire]').value
+            };
+            
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(handleResponse);
+        }
+
+        // Fonction commune pour gérer la réponse de l'API
+        function handleResponse(response) {
+            if (response.ok) {
+                location.reload(); // Si succès, on recharge la page
+            } else {
+                alert('Erreur: L\'action a échoué. Veuillez réessayer.');
+                location.reload(); // On recharge aussi en cas d'erreur pour réactiver les boutons
+            }
+        }
+    </script>
+</body>
+</html>

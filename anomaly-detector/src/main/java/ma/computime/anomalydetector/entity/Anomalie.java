@@ -23,8 +23,8 @@ public class Anomalie {
 
     // --- NOUVEAU CHAMP AJOUTÉ : Le manager responsable de la validation ---
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "manager_assigne_fk", referencedColumnName = "ID", nullable = true)
-    private Employe managerAssigne;
+    @JoinColumn(name = "noeud_concerne_fk")
+    private Noeud noeudConcerne;
     // ----------------------------------------------------------------------
 
     @Column(name = "jour_anomalie")

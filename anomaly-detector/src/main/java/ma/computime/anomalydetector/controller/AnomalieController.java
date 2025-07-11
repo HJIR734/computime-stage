@@ -56,30 +56,35 @@ public class AnomalieController {
                 .collect(Collectors.toList());
     }
     
-    // --- VUES POUR LE ROLE MANAGER ---
+    // --- VUE PAR NOEUD (pour le Manager de ce noeud) ---
 
-    @GetMapping("/manager/{managerId}/en-attente")
-    public List<AnomalieDto> getAnomaliesEnAttentePourManager(@PathVariable Integer managerId) {
-        List<Anomalie> anomalies = anomalieRepository.findByManagerAssigneIdAndStatut(managerId, StatutAnomalie.EN_ATTENTE);
+    /**
+     * Récupère les anomalies en attente pour un noeud hiérarchique spécifique (service, département...).
+     * C'est l'endpoint que le manager d'un service utilisera.
+     * @param noeudId L'ID du noeud hiérarchique.
+     */
+    @GetMapping("/noeud/{noeudId}/en-attente")
+    public List<AnomalieDto> getAnomaliesEnAttentePourNoeud(@PathVariable Integer noeudId) {
+        // On utilise la nouvelle méthode du repository qui filtre par l'ID du noeud.
+        List<Anomalie> anomalies = anomalieRepository.findByNoeudConcerneIdAndStatut(noeudId, StatutAnomalie.EN_ATTENTE);
         return anomalies.stream()
                 .map(AnomalieMapper::toAnomalieDto)
                 .collect(Collectors.toList());
     }
 
-    // --- ACTIONS DU MANAGER ---
+
+    // --- ACTIONS DE VALIDATION (par un Manager ou RH) ---
 
     @PostMapping("/{id}/valider")
     public ResponseEntity<?> validerAnomalie(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
         String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
         Optional<Anomalie> resultat = anomalieWorkflowService.validerAnomalie(id, commentaire);
         
-        // --- DÉBUT DE LA CORRECTION ---
         if (resultat.isPresent()) {
             return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Anomalie non trouvée ou statut invalide pour l'ID : " + id);
         }
-        // --- FIN DE LA CORRECTION ---
     }
 
     @PostMapping("/{id}/rejeter")
@@ -87,26 +92,22 @@ public class AnomalieController {
         String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
         Optional<Anomalie> resultat = anomalieWorkflowService.rejeterAnomalie(id, commentaire);
         
-        // --- DÉBUT DE LA CORRECTION ---
         if (resultat.isPresent()) {
             return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Anomalie non trouvée ou statut invalide pour l'ID : " + id);
         }
-        // --- FIN DE LA CORRECTION ---
     }
     
     @PostMapping("/{id}/accepter-suggestion")
     public ResponseEntity<?> accepterSuggestion(@PathVariable Long id) {
         Optional<Anomalie> resultat = suggestionActionService.accepterSuggestion(id);
         
-        // --- DÉBUT DE LA CORRECTION ---
         if (resultat.isPresent()) {
             return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Impossible d'appliquer la suggestion pour l'anomalie ID : " + id);
         }
-        // --- FIN DE LA CORRECTION ---
     }
     
     @PostMapping("/{id}/corriger-manuellement")
@@ -116,12 +117,10 @@ public class AnomalieController {
         
         Optional<Anomalie> resultat = anomalieWorkflowService.corrigerManuellement(id, payload.getHeureCorrigee(), payload.getCommentaire());
         
-        // --- DÉBUT DE LA CORRECTION ---
         if (resultat.isPresent()) {
             return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Impossible de corriger l'anomalie. Vérifiez l'ID, le statut, le type (OMISSION_POINTAGE) et le format de l'heure (HH:mm).");
         }
-        // --- FIN DE LA CORRECTION ---
     }
 }

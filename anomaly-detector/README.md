@@ -8,12 +8,12 @@ Ce projet est un microservice intelligent développé avec **Spring Boot** (Java
 
 Le service est capable de détecter automatiquement les anomalies suivantes :
 
-*   ✅ **Omission de Pointage** : Détecte les journées avec un nombre impair de pointages et propose une heure de correction via un modèle de régression (LightGBM).
-*   ✅ **Retard à l'arrivée** : Identifie les arrivées après l'heure théorique et utilise un modèle de classification (LightGBM) pour suggérer une action.
-*   ✅ **Sortie Anticipée** : Identifie les départs avant l'heure théorique.
-*   ✅ **Heures Supplémentaires non autorisées** : Calcule le temps de travail dépassant la durée théorique et utilise un modèle de classification pour suggérer une décision (Accepter/Rejeter).
-*   ✅ **Absence Injustifiée** : Détecte les jours où un employé aurait dû travailler mais n'a aucun pointage.
-*   ✅ **Travail un Jour Férié / de Repos** : Identifie les pointages sur des jours non travaillés.
+*    **Omission de Pointage** : Détecte les journées avec un nombre impair de pointages et propose une heure de correction via un modèle de régression (LightGBM).
+*    **Retard à l'arrivée** : Identifie les arrivées après l'heure théorique et utilise un modèle de classification (LightGBM) pour suggérer une action.
+*    **Sortie Anticipée** : Identifie les départs avant l'heure théorique.
+*    **Heures Supplémentaires non autorisées** : Calcule le temps de travail dépassant la durée théorique et utilise un modèle de classification pour suggérer une décision (Accepter/Rejeter).
+*    **Absence Injustifiée** : Détecte les jours où un employé aurait dû travailler mais n'a aucun pointage.
+*    **Travail un Jour Férié / de Repos** : Identifie les pointages sur des jours non travaillés.
 
 Le système propose également un **workflow de validation** simple via une API REST, permettant à un superviseur de valider ou de rejeter les anomalies détectées.
 
