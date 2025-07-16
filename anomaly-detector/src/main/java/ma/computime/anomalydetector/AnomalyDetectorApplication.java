@@ -8,7 +8,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestClient; 
 import org.springframework.web.client.RestTemplate;
 
+
+
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 @SpringBootApplication
+@EnableScheduling
 public class AnomalyDetectorApplication {
 
     public static void main(String[] args) {
@@ -25,7 +30,7 @@ public class AnomalyDetectorApplication {
     @Bean
     public RestClient restClient() {
         return RestClient.builder()
-                .baseUrl("http://localhost:5000") 
+                .baseUrl("http://localhost:5001") 
                 .build();
     }
     @Bean

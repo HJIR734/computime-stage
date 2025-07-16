@@ -8,6 +8,7 @@ import ma.computime.anomalydetector.entity.TypeAnomalie;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.util.List;
+import ma.computime.anomalydetector.entity.StatutAnomalie;
 
 public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
 
@@ -18,4 +19,5 @@ public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
 
     boolean existsByEmployeAndJourAnomalieAndTypeAnomalie(Employe employe, LocalDate jourAnomalie, TypeAnomalie typeAnomalie);
     List<Anomalie> findByNoeudConcerneIdAndStatutNot(Integer noeudId, StatutAnomalie statut);
+     long countByEmployeAndTypeAnomalieAndStatut(Employe employe, TypeAnomalie type, StatutAnomalie statut);
 }

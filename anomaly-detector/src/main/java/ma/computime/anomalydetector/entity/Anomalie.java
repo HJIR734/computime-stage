@@ -56,4 +56,7 @@ public class Anomalie {
 
     @Column(name = "date_resolution")
     private LocalDateTime dateResolution;
+
+    @Column(name = "duree_minutes")
+    private Long dureeEnMinutes;
 }

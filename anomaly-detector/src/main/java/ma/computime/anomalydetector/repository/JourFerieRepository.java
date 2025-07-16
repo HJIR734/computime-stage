@@ -1,11 +1,10 @@
-// Emplacement: ma/computime/anomalydetector/repository/JourFerieRepository.java
+// Dans JourFerieRepository.java
 package ma.computime.anomalydetector.repository;
 
 import ma.computime.anomalydetector.entity.JourFerie;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDate;
 
 public interface JourFerieRepository extends JpaRepository<JourFerie, Integer> {
@@ -16,6 +15,6 @@ public interface JourFerieRepository extends JpaRepository<JourFerie, Integer> {
      * @param date La date à vérifier.
      * @return true si la date est un jour férié, false sinon.
      */
-    @Query("SELECT COUNT(jf) > 0 FROM JourFerie jf WHERE FUNCTION('DATE', jf.dateDebut) = :date")
+    @Query("SELECT count(jf) > 0 FROM JourFerie jf WHERE date(jf.dateDebut) = :date")
     boolean existsByDate(@Param("date") LocalDate date);
 }

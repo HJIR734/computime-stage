@@ -4,6 +4,7 @@ package ma.computime.anomalydetector.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "jr_ferie") // Nom de la table correct
