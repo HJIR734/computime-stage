@@ -4,8 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set; // <--- AJOUTE CETTE LIGNE
 
 @Entity
 @Table(name = "utilisateur")
@@ -45,4 +49,12 @@ public class Employe {
     @OneToMany(mappedBy = "employe", fetch = FetchType.LAZY)
     @JsonManagedReference("employe-pointage")
     private List<Pointage> pointages;
+
+    @ManyToMany(mappedBy = "employes") // "mappedBy" indique que c'est l'autre côté qui gère la relation
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<PlanningException> exceptions;
+
+    @Column(name = "SOLDE_ANNUEL")
+    private Double soldeConges;
 }

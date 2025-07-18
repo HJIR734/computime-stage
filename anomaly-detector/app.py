@@ -7,82 +7,84 @@ import numpy as np
 import os
 import shap
 
-# 1. Initialiser l'application Flask
 app = Flask(__name__)
 
-# ==============================================================================
-# CHARGEMENT DE TOUS LES MODÈLES AU DÉMARRAGE DE L'APPLICATION
-# ==============================================================================
-
-# --- Dictionnaire pour stocker les modèles, explainers et features attendues ---
+# Dictionnaires globaux
 models = {}
 explainers = {}
 expected_features = {}
 
 def load_model_and_explainer(name, path):
-    """Charge un modèle et, si possible, son explainer SHAP."""
     print(f"--- Chargement du modèle '{name}' depuis '{path}'... ---")
-    
     if not os.path.exists(path):
         print(f"-> ERREUR: Fichier '{path}' est introuvable.")
         return
-
     try:
         model = joblib.load(path)
         models[name] = model
         print(f"-> Modèle '{name}' chargé avec succès.")
-
-        # Essayer de créer un explainer et de stocker les features
         if hasattr(model, 'feature_name_'):
             expected_features[name] = model.feature_name_
         elif hasattr(model, 'feature_names_in_'):
              expected_features[name] = model.feature_names_in_
-        else:
-            print(f"Avertissement: Impossible de déterminer les features pour le modèle '{name}'.")
-
-        # Créer un TreeExplainer pour les modèles en arbre (comme LightGBM)
         if 'lgbm' in str(type(model)).lower():
             explainers[name] = shap.TreeExplainer(model)
             print(f"-> Explainer SHAP (Tree) pour '{name}' créé.")
-        else:
-            print(f"-> Pas d'explainer SHAP automatique pour ce type de modèle ({type(model)}).")
-
     except Exception as e:
-        print(f"-> ERREUR critique au chargement du modèle ou de l'explainer '{name}': {e}")
+        print(f"-> ERREUR critique au chargement '{name}': {e}")
 
-# --- Chargement de tous les modèles ---
+# Chargement de tous les modèles
 load_model_and_explainer('omission', './models/model_prediction_personnalise.pkl')
 load_model_and_explainer('hs_contextuel', './models/model_hs_contextuel.pkl')
 load_model_and_explainer('retard_contextuel', './models/model_retards_contextuel.pkl')
 load_model_and_explainer('sortie_anticipee_context', './models/model_sortie_anticipee.pkl')
-
-# === MODIFICATION 1 : CHARGEMENT DU NOUVEAU MODÈLE ET DES ENCODEURS ===
 load_model_and_explainer('compensation', './models/model_compensation.pkl')
+load_model_and_explainer('absence_injustifiee', './models/model_absence_injustifiee.pkl')
+
 try:
     models['encoder_jour_type'] = joblib.load('./models/encoder_jour_type.pkl')
     models['encoder_decision_compensation'] = joblib.load('./models/encoder_decision_compensation.pkl')
-    print("-> Encodeurs pour la compensation chargés avec succès.")
+    models['encoder_decision_absence'] = joblib.load('./models/encoder_decision_absence.pkl')
+    print("-> Tous les encodeurs ont été chargés avec succès.")
 except Exception as e:
-    print(f"-> ERREUR: Impossible de charger les encodeurs pour la compensation : {e}")
-# =====================================================================
+    print(f"-> ERREUR: Impossible de charger un ou plusieurs encodeurs : {e}")
 
+# === CORRECTION FINALE de la fonction de justification ===
+# === FONCTION DE JUSTIFICATION AVEC DÉBUGGAGE ===
+# === CORRECTION DÉFINITIVE v3 de la fonction de justification ===
+def get_shap_based_justification(explainer, input_df, feature_names):
+    """
+    Génère une justification basée sur les valeurs SHAP.
+    Gère les modèles binaires et multiclasses.
+    """
+    shap_values_raw = explainer.shap_values(input_df)
 
-# ==============================================================================
-# ENDPOINTS DE L'API
-# ==============================================================================
+    # shap_values_raw a la forme (nb_lignes, nb_features, nb_classes)
+    # ou (nb_lignes, nb_features) pour le binaire
+    
+    # On prend la première (et seule) ligne de données
+    shap_values_for_instance = shap_values_raw[0]
 
-# --- Fonctions utilitaires pour les justifications ---
-def get_shap_based_justification(explainer, model, input_df, feature_names):
-    shap_values = explainer.shap_values(input_df)
-    shap_values_for_class = shap_values[1] if isinstance(shap_values, list) else shap_values
-    feature_impacts = pd.Series(shap_values_for_class[0], index=feature_names).sort_values(ascending=False)
+    # Si on est en multiclasse (3D au départ -> 2D maintenant), on agrège
+    if len(shap_values_for_instance.shape) == 2:
+        # On calcule la moyenne des valeurs absolues sur l'axe des classes (axis=1)
+        # pour obtenir l'importance globale de chaque feature
+        feature_impacts_values = np.mean(np.abs(shap_values_for_instance), axis=1)
+    # Sinon, on est en binaire (2D au départ -> 1D maintenant)
+    else:
+        feature_impacts_values = np.abs(shap_values_for_instance)
+
+    # À ce stade, feature_impacts_values est GARANTI d'être en 1D
+    # de la forme (5,)
+    feature_impacts = pd.Series(feature_impacts_values, index=feature_names).sort_values(ascending=False)
+    
     return feature_impacts.head(2).index.tolist()
 
-# --- ENDPOINT N°1 : PRÉDICTION POUR LES OMISSIONS DE POINTAGE ---
+# --- Tous les endpoints ---
+
 @app.route('/predict/entree', methods=['POST'])
 def predict_entree():
-    if 'omission' not in models:
-        return jsonify({'erreur': "Le modèle de prédiction d'omission n'est pas disponible."}), 503
+    if 'omission' not in models: return jsonify({'erreur': "Modèle omission non disponible."}), 503
     data = request.get_json()
     features_df = pd.DataFrame([data])
     features_df['badge'] = features_df['badge'].astype('category')
@@ -90,21 +92,20 @@ def predict_entree():
     heure_predite = f"{int(prediction_secondes / 3600):02d}:{int((prediction_secondes % 3600) / 60):02d}"
     return jsonify({'suggestion_heure': heure_predite})
 
-# --- ENDPOINT N°2 : HS CONTEXTUELLES AVEC JUSTIFICATION ---
 @app.route('/predict/overtime-context', methods=['POST'])
 def predict_overtime_context():
-    if 'hs_contextuel' not in models or 'hs_contextuel' not in explainers:
-        return jsonify({'erreur': 'Le modèle ou l\'explainer HS n\'est pas disponible.'}), 503
+    model_name = 'hs_contextuel'
+    if model_name not in models or model_name not in explainers: return jsonify({'erreur': 'Modèle HS non disponible.'}), 503
     data = request.get_json()
-    input_df = pd.DataFrame([data], columns=expected_features['hs_contextuel'])
-    prediction_proba = models['hs_contextuel'].predict_proba(input_df)[0]
+    input_df = pd.DataFrame([data], columns=expected_features[model_name])
+    model = models[model_name]
+    prediction_proba = model.predict_proba(input_df)[0]
     decision_index = np.argmax(prediction_proba)
-    decision = "ACCEPTER" if models['hs_contextuel'].classes_[decision_index] == 1 else "REJETER"
+    decision = "ACCEPTER" if model.classes_[decision_index] == 1 else "REJETER"
     confiance = prediction_proba[decision_index]
-    justification_features = get_shap_based_justification(explainers['hs_contextuel'], models['hs_contextuel'], input_df, expected_features['hs_contextuel'])
+    justification_features = get_shap_based_justification(explainers[model_name], input_df, expected_features[model_name])
     return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_features})
 
-# --- ENDPOINT N°3 : RETARDS CONTEXTUELS ---
 @app.route('/predict/retard-context', methods=['POST'])
 def predict_retard_context():
     if 'retard_contextuel' not in models:
@@ -124,95 +125,97 @@ def predict_retard_context():
     if not justification: justification.append("Analyse standard.")
     return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification})
 
-
-# --- ENDPOINT N°4 : SORTIE ANTICIPÉE CONTEXTUELLE AVEC JUSTIFICATION SHAP ---
 @app.route('/predict/sortie-anticipee-context', methods=['POST'])
 def predict_sortie_anticipee_context():
-    if 'sortie_anticipee_context' not in models or 'sortie_anticipee_context' not in explainers:
-        return jsonify({'erreur': 'Le modèle ou l\'explainer de sortie anticipée n\'est pas disponible.'}), 503
+    model_name = 'sortie_anticipee_context'
+    if model_name not in models or model_name not in explainers: return jsonify({'erreur': 'Modèle sortie anticipée non disponible.'}), 503
+    data = request.get_json()
+    features = expected_features[model_name]
+    input_df = pd.DataFrame([data], columns=features)
+    model = models[model_name]
+    prediction_proba = model.predict_proba(input_df)[0]
+    decision_index = np.argmax(prediction_proba)
+    decision = "TOLÉRER" if model.classes_[decision_index] == 1 else "JUSTIFICATION REQUISE"
+    confiance = prediction_proba[decision_index]
+    explainer = explainers[model_name]
+    justification_features = get_shap_based_justification(explainer, input_df, features)
+    return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_features})
 
-    try:
-        data = request.get_json()
-        print(f"\n--- Requête reçue sur /predict/sortie-anticipee-context : {data} ---")
-        features = expected_features['sortie_anticipee_context']
-        input_df = pd.DataFrame([data], columns=features)
-        model = models['sortie_anticipee_context']
-        prediction_proba = model.predict_proba(input_df)[0]
-        decision_index = np.argmax(prediction_proba)
-        decision = "TOLÉRER" if model.classes_[decision_index] == 1 else "JUSTIFICATION REQUISE"
-        confiance = prediction_proba[decision_index]
-        explainer = explainers['sortie_anticipee_context']
-        justification_features = get_shap_based_justification(explainer, model, input_df, features)
-        justification_textuelle = []
-        for feature in justification_features:
-            if feature == 'duree_anticipation_minutes':
-                justification_textuelle.append(f"Durée de l'anticipation ({int(data[feature])} min) a été le facteur principal.")
-            elif feature == 'est_fin_semaine':
-                justification_textuelle.append("Le fait que ce soit la fin de semaine a été pris en compte.")
-            elif feature == 'nb_hs_recentes_heures':
-                justification_textuelle.append(f"L'historique des heures sup ({int(data[feature])}h) a influencé la décision.")
-            elif feature == 'charge_travail_jour':
-                 justification_textuelle.append("La charge de travail du jour a été un facteur.")
-        if not justification_textuelle: justification_textuelle.append("Analyse standard des données.")
-        response = {"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_textuelle}
-        print(f"-> Décision finale : {response}")
-        return jsonify(response)
-        
-    except Exception as e:
-        print(f"ERREUR PENDANT LA PRÉDICTION DE SORTIE ANTICIPÉE : {e}")
-        return jsonify({'erreur': str(e)}), 500
-
-# === MODIFICATION 2 : AJOUT DU NOUVEL ENDPOINT POUR LA COMPENSATION ===
-# --- ENDPOINT N°5 : PRÉDICTION POUR LA COMPENSATION ---
 @app.route('/predict/compensation', methods=['POST'])
 def predict_compensation():
     required_models = ['compensation', 'encoder_jour_type', 'encoder_decision_compensation']
-    if not all(key in models for key in required_models):
-        return jsonify({'erreur': 'Le modèle ou les encodeurs de compensation ne sont pas disponibles.'}), 503
+    if not all(key in models for key in required_models): return jsonify({'erreur': 'Modèle compensation non disponible.'}), 503
+    data = request.get_json()
+    input_data = {'type_jour': data.get('type_jour'), 'duree_travaillee_heures': data.get('duree_travaillee_heures'), 'solde_repos_actuel_heures': data.get('solde_repos_actuel_heures')}
+    input_df = pd.DataFrame([input_data])
+    input_df['type_jour_encoded'] = models['encoder_jour_type'].transform(input_df['type_jour'])
+    features_for_model = input_df[['type_jour_encoded', 'duree_travaillee_heures', 'solde_repos_actuel_heures']]
+    features_for_model.columns = expected_features['compensation'] 
+    model = models['compensation']
+    prediction_encoded = model.predict(features_for_model)[0]
+    prediction_proba = model.predict_proba(features_for_model)[0]
+    decision = models['encoder_decision_compensation'].inverse_transform([prediction_encoded])[0]
+    confiance = np.max(prediction_proba)
+    justification = [f"Suggestion basée sur la durée travaillée et le solde de repos."]
+    response = {"decision": f"COMPENSATION_{decision}", "confiance": f"{confiance:.0%}", "justification": justification}
+    return jsonify(response)
+    
+@app.route('/predict/absence-injustifiee', methods=['POST'])
+def predict_absence_injustifiee():
+    model_name = 'absence_injustifiee'
+    encoder_name = 'encoder_decision_absence'
+    if model_name not in models or encoder_name not in models or model_name not in explainers: 
+        return jsonify({'erreur': "Modèle absence non disponible."}), 503
+    
+    data = request.get_json()
+    features = expected_features[model_name]
+    input_df = pd.DataFrame([data], columns=features)
+    
+    model = models[model_name]
+    prediction_proba = model.predict_proba(input_df)[0]
+    prediction_encoded = np.argmax(prediction_proba)
+    decision_encoder = models[encoder_name]
+    decision = decision_encoder.inverse_transform([prediction_encoded])[0]
+    confiance = np.max(prediction_proba)
+    
+    explainer = explainers[model_name]
+    justification_features = get_shap_based_justification(explainer, input_df, features)
+    
+    # === CORRECTION : On construit une justification plus détaillée ===
+    justification_textuelle = []
+    for feature in justification_features:
+        if feature == 'solde_conges_jours':
+            valeur = int(data.get(feature, 0))
+            if valeur <= 2:
+                justification_textuelle.append(f"Le faible solde de congés ({valeur} j) a été un facteur clé.")
+            else:
+                justification_textuelle.append(f"Le solde de congés de l'employé ({valeur} j) a été pris en compte.")
+        
+        elif feature == 'nb_absences_injustifiees_annee':
+            valeur = int(data.get(feature, 0))
+            if valeur > 2:
+                justification_textuelle.append(f"L'historique d'absences récurrentes ({valeur}) a fortement influencé la décision.")
+            else:
+                justification_textuelle.append(f"L'historique d'absences ({valeur}) a été un facteur.")
 
-    try:
-        data = request.get_json()
-        print(f"\n--- Requête reçue sur /predict/compensation : {data} ---")
-        
-        input_data = {
-            'type_jour': data.get('type_jour'),
-            'duree_travaillee_heures': data.get('duree_travaillee_heures'),
-            'solde_repos_actuel_heures': data.get('solde_repos_actuel_heures')
-        }
-        input_df = pd.DataFrame([input_data])
-        
-        input_df['type_jour_encoded'] = models['encoder_jour_type'].transform(input_df['type_jour'])
-        
-        features_for_model = input_df[['type_jour_encoded', 'duree_travaillee_heures', 'solde_repos_actuel_heures']]
-        # S'assurer que les noms de colonnes sont corrects pour le modèle
-        features_for_model.columns = expected_features['compensation'] 
-        
-        model = models['compensation']
-        prediction_encoded = model.predict(features_for_model)[0]
-        prediction_proba = model.predict_proba(features_for_model)[0]
-        
-        decision = models['encoder_decision_compensation'].inverse_transform([prediction_encoded])[0]
-        confiance = np.max(prediction_proba)
+        elif feature == 'duree_absence_jours':
+            valeur = int(data.get(feature, 0))
+            if valeur > 2:
+                 justification_textuelle.append(f"La longue durée de l'absence ({valeur} jours) a été un élément important.")
+            else:
+                 justification_textuelle.append(f"La durée de l'absence ({valeur} jour(s)) a été analysée.")
 
-        justification = [f"Suggestion basée sur la durée travaillée ({data['duree_travaillee_heures']}h) et le solde de repos de l'employé ({data['solde_repos_actuel_heures']}h)."]
-        
-        response = {
-            "decision": f"COMPENSATION_{decision}", # ex: COMPENSATION_PAYE ou COMPENSATION_REPOS
-            "confiance": f"{confiance:.0%}",
-            "justification": justification
-        }
-        
-        print(f"-> Décision finale : {response}")
-        return jsonify(response)
-        
-    except Exception as e:
-        print(f"ERREUR PENDANT LA PRÉDICTION DE COMPENSATION : {e}")
-        return jsonify({'erreur': str(e)}), 500
-# =======================================================================
+        elif feature == 'est_adjacent_weekend_ferie':
+            if data.get(feature) == 1:
+                justification_textuelle.append("Le fait que l'absence soit proche d'un jour de repos a été considéré.")
+    
+    if not justification_textuelle:
+        justification_textuelle.append("Suggestion basée sur l'analyse générale des données.")
+    # =====================================================================
 
-# ==============================================================================
-# Lancement du serveur
-# ==============================================================================
+    response = {"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_textuelle}
+    return jsonify(response)
+
 if __name__ == '__main__':
     print("\nLancement du serveur Flask...")
     app.run(debug=True, host='0.0.0.0', port=5001)

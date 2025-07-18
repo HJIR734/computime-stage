@@ -39,10 +39,15 @@
                     </thead>
                     <tbody>
                         <tr th:each="anomalie : ${anomalies}">
+                            <!-- ======================================================== -->
+                            <!-- === C'EST LA SEULE PARTIE QUI A ÉTÉ CORRIGÉE === -->
+                            <!-- ======================================================== -->
                             <td>
                                 <strong th:text="${anomalie.employe.prenom} + ' ' + ${anomalie.employe.nom}"></strong><br>
                                 <small class="text-muted" th:text="'Badge: ' + ${anomalie.employe.badge}"></small>
                             </td>
+                            <!-- ======================================================== -->
+                            
                             <td><span class="badge bg-danger" th:text="${anomalie.typeAnomalie}"></span></td>
                             <td th:text="${anomalie.message}"></td>
                             <td>
@@ -60,21 +65,26 @@
                                 </form>
 
                                 <!-- Actions pour ABSENCE_INJUSTIFIEE -->
-                                <div class="action-group" th:if="${anomalie.typeAnomalie.name() == 'ABSENCE_INJUSTIFIEE'}">
-                                    <button type="button" class="btn btn-info btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider(id=${anomalie.id})}', 'Requalifiée en Absence justifiée.')|">
-                                        <i class="bi bi-journal-check"></i> Requalifier
-                                    </button>
-                                    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter(id=${anomalie.id})}', 'Confirmée comme Absence Injustifiée.')|">
-                                        <i class="bi bi-hand-thumbs-down"></i> Confirmer Absence
-                                    </button>
-                                </div>
+                                <!-- Actions pour ABSENCE_INJUSTIFIEE -->
+<div class="action-group" th:if="${anomalie.typeAnomalie.name() == 'ABSENCE_INJUSTIFIEE'}">
+    <button type="button" class="btn btn-info btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider-manuellement(id=${anomalie.id})}', 'Requalifiée en Absence justifiée.')|">
+        <i class="bi bi-journal-check"></i> Requalifier
+    </button>
+    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter-manuellement(id=${anomalie.id})}', 'Confirmée comme Absence Injustifiée.')|">
+        <i class="bi bi-hand-thumbs-down"></i> Confirmer Absence
+    </button>
+    <!-- On ajoute l'affichage de la suggestion ici aussi -->
+    <div th:if="${anomalie.suggestion != null}" class="form-text mt-1">
+        <i class="bi bi-lightbulb-fill text-primary"></i> <span th:text="${anomalie.suggestion}"></span>
+    </div>
+</div>
 
                                 <!-- Actions génériques pour les autres (RETARD, SORTIE_ANTICIPEE, HEURE_SUP...) -->
                                 <div class="action-group" th:if="${anomalie.typeAnomalie.name() != 'OMISSION_POINTAGE' && anomalie.typeAnomalie.name() != 'ABSENCE_INJUSTIFIEE'}">
-                                    <button type="button" class="btn btn-success btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider(id=${anomalie.id})}', 'Validé par manager.')|">
+                                    <button type="button" class="btn btn-success btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/valider-manuellement(id=${anomalie.id})}', 'Validé par manager.')|">
                                         <i class="bi bi-check-lg"></i> Valider
                                     </button>
-                                    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter(id=${anomalie.id})}', 'Rejeté par manager.')|">
+                                    <button type="button" class="btn btn-danger btn-sm" th:onclick="|simpleAction(this, '@{/api/anomalies/{id}/rejeter-manuellement(id=${anomalie.id})}', 'Rejeté par manager.')|">
                                         <i class="bi bi-x-lg"></i> Rejeter
                                     </button>
                                     <div th:if="${anomalie.suggestion != null}" class="form-text mt-1">
@@ -88,7 +98,7 @@
             </div>
         </div>
 
-        <!-- Section de l'Historique -->
+        <!-- Section de l'Historique (aussi corrigée pour être sûre) -->
         <div class="card shadow-sm mt-4">
             <div class="card-header bg-secondary text-white">
                 <i class="bi bi-clock-history"></i> Historique Récent
@@ -102,7 +112,7 @@
                     <tbody>
                         <tr th:each="h : ${historique}" th:classappend="${h.statut.name() == 'VALIDEE' || h.statut.name() == 'RESOLUE' ? 'table-light' : 'table-light'}">
                             <td th:text="${h.id}"></td>
-                            <td th:text="${h.employe.nom}"></td>
+                            <td th:text="${h.employe.nom}"></td> <!-- Correction ici aussi -->
                             <td th:text="${h.typeAnomalie}"></td>
                             <td>
                                 <span th:if="${h.statut.name() == 'VALIDEE' || h.statut.name() == 'RESOLUE'}" class="badge bg-success" th:text="${h.statut}"></span>
@@ -116,11 +126,10 @@
         </div>
     </div>
 
-    <!-- Le script JavaScript qui gère toutes les actions -->
+    <!-- Le script JavaScript d'ORIGINE, simple et fonctionnel -->
     <script>
-        // Fonction pour les actions simples (Valider, Rejeter, Requalifier)
         function simpleAction(button, url, commentaire) {
-            button.disabled = true; // Empêche le double-clic
+            button.disabled = true; 
             const body = { commentaire: commentaire };
             
             fetch(url, {
@@ -130,7 +139,6 @@
             }).then(handleResponse);
         }
 
-        // Fonction pour le formulaire de correction (Omission)
         function handleFormSubmit(event) {
             event.preventDefault();
             const form = event.target;
@@ -149,13 +157,12 @@
             }).then(handleResponse);
         }
 
-        // Fonction commune pour gérer la réponse de l'API
         function handleResponse(response) {
             if (response.ok) {
-                location.reload(); // Si succès, on recharge la page
+                location.reload();
             } else {
                 alert('Erreur: L\'action a échoué. Veuillez réessayer.');
-                location.reload(); // On recharge aussi en cas d'erreur pour réactiver les boutons
+                location.reload(); 
             }
         }
     </script>

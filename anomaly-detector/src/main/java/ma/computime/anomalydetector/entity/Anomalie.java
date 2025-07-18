@@ -21,11 +21,9 @@ public class Anomalie {
     @JoinColumn(name = "employe_badge", referencedColumnName = "BADGE")
     private Employe employe;
 
-    // --- NOUVEAU CHAMP AJOUTÉ : Le manager responsable de la validation ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "noeud_concerne_fk")
     private Noeud noeudConcerne;
-    // ----------------------------------------------------------------------
 
     @Column(name = "jour_anomalie")
     private LocalDate jourAnomalie;
@@ -41,22 +39,47 @@ public class Anomalie {
     @Column(name = "statut")
     private StatutAnomalie statut;
 
+    // --- Colonne de suggestion originale, on peut la garder ou la commenter si non utilisée ---
     @Column(name = "suggestion_correction")
     private String suggestion;
 
+    // ====================================================================
+    // === CHAMPS DÉDIÉS AUX SUGGESTIONS DE L'IA - VERSION COMPLÈTE ===
+    // ====================================================================
+    
+    /**
+     * Stocke la décision principale de l'IA (ex: "ACCEPTER", "REJETER").
+     * C'est le nouveau champ qui causait l'erreur.
+     */
+    @Column(name = "decision_ia", length = 50)
+    private String decisionIa;
+
+    /**
+     * Stocke la justification textuelle complète fournie par l'IA.
+     * C'est le deuxième nouveau champ.
+     */
+    @Column(name = "justification_ia", length = 1000)
+    private String justificationIa;
+
+    /**
+     * Stocke la valeur concrète suggérée par l'IA (ex: heure de pointage manquant).
+     * Ce champ existait déjà, il est conservé.
+     */
+    @Column(name = "valeur_suggestion")
+    private LocalTime valeurSuggestion;
+
+    // ====================================================================
+
+    @Column(name = "duree_minutes")
+    private Long dureeEnMinutes;
+    
+    @Column(name = "commentaire_validation")
+    private String commentaireValidation;
+    
     @CreationTimestamp
     @Column(name = "date_creation", updatable = false)
     private LocalDateTime dateCreation;
 
-    @Column(name = "commentaire_validation")
-    private String commentaireValidation;
-    
-    @Column(name = "valeur_suggestion")
-    private LocalTime valeurSuggestion;
-
     @Column(name = "date_resolution")
     private LocalDateTime dateResolution;
-
-    @Column(name = "duree_minutes")
-    private Long dureeEnMinutes;
 }

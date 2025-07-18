@@ -39,37 +39,43 @@ public class SuggestionActionService {
         }
 
         Anomalie anomalie = anomalieOpt.get();
-        TypeAnomalie type = anomalie.getTypeAnomalie();
 
-        // =================================================================
-        // === NOUVELLE LOGIQUE : On traite chaque type d'anomalie différemment ===
-        // =================================================================
-        
-        // --- CAS 1 : C'est une OMISSION DE POINTAGE ---
-        if (type == TypeAnomalie.OMISSION_POINTAGE) {
-            if (anomalie.getValeurSuggestion() != null) {
+        switch (anomalie.getTypeAnomalie()) {
+            case OMISSION_POINTAGE:
                 return appliquerSuggestionOmission(anomalie);
-            } else {
-                logger.warn("Suggestion pour OMISSION (ID {}) non applicable car pas de valeur d'heure.", anomalieId);
+
+            case HEURE_SUP_NON_AUTORISEE:
+                return appliquerSuggestionSimpleValidation(anomalie, "Heure supplémentaire");
+
+            case RETARD:
+                return appliquerSuggestionSimpleValidation(anomalie, "Retard");
+
+            case SORTIE_ANTICIPEE:
+                return appliquerSuggestionSimpleValidation(anomalie, "Sortie anticipée");
+                
+            case TRAVAIL_JOUR_FERIE:
+            case TRAVAIL_JOUR_REPOS:
+                return appliquerSuggestionSimpleValidation(anomalie, "Travail jour non-ouvrable");
+
+            case ABSENCE_INJUSTIFIEE:
+                return appliquerSuggestionSimpleValidation(anomalie, "Absence injustifiée");
+
+            default:
+                logger.warn("Aucune action d'acceptation de suggestion n'est définie pour le type d'anomalie : {}", anomalie.getTypeAnomalie());
                 return Optional.empty();
-            }
         }
-
-        // --- CAS 2 : C'est une HEURE SUPPLÉMENTAIRE ---
-        if (type == TypeAnomalie.HEURE_SUP_NON_AUTORISEE) {
-            // Pour une HS, "accepter la suggestion" signifie simplement valider l'anomalie.
-            return appliquerSuggestionHeureSup(anomalie);
-        }
-        
-        // (Plus tard, on pourra ajouter d'autres "if" pour d'autres types d'anomalies)
-
-        logger.warn("Aucune action d'acceptation de suggestion n'est définie pour le type d'anomalie : {}", type);
-        return Optional.empty();
     }
+    
+    
 
     private Optional<Anomalie> appliquerSuggestionOmission(Anomalie anomalie) {
+        if (anomalie.getValeurSuggestion() == null) {
+            logger.warn("Suggestion pour OMISSION (ID {}) non applicable car pas de valeur d'heure.", anomalie.getId());
+            return Optional.empty();
+        }
+        
         logger.info("Application de la suggestion pour OMISSION (ID {}): création d'un pointage.", anomalie.getId());
-
+        
         Pointage nouveauPointage = new Pointage();
         nouveauPointage.setEmploye(anomalie.getEmploye());
         nouveauPointage.setBadgeEmploye(anomalie.getEmploye().getBadge());
@@ -87,15 +93,15 @@ public class SuggestionActionService {
         return Optional.of(anomalie);
     }
     
-    private Optional<Anomalie> appliquerSuggestionHeureSup(Anomalie anomalie) {
-        logger.info("Application de la suggestion pour HEURE_SUP (ID {}): validation de l'anomalie.", anomalie.getId());
+    private Optional<Anomalie> appliquerSuggestionSimpleValidation(Anomalie anomalie, String typeDescription) {
+        logger.info("Application d'une validation simple pour {} (ID {}).", typeDescription, anomalie.getId());
 
-        anomalie.setStatut(StatutAnomalie.VALIDEE); // Pour une HS, accepter = valider
-        anomalie.setCommentaireValidation("Heure supplémentaire validée suite à la suggestion de l'IA.");
+        anomalie.setStatut(StatutAnomalie.VALIDEE);
+        anomalie.setCommentaireValidation(typeDescription + " validé(e) suite à la suggestion de l'IA. Décision IA : " + anomalie.getDecisionIa());
         anomalie.setDateResolution(LocalDateTime.now());
         anomalieRepository.save(anomalie);
 
-        logger.info("Anomalie d'heure supplémentaire ID {} validée.", anomalie.getId());
+        logger.info("Anomalie de type {} ID {} validée.", typeDescription, anomalie.getId());
         return Optional.of(anomalie);
     }
 }

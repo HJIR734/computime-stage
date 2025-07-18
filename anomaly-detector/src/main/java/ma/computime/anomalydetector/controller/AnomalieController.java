@@ -15,10 +15,10 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -31,14 +31,16 @@ public class AnomalieController {
     @Autowired private SuggestionActionService suggestionActionService;
     @Autowired private AnomalieRepository anomalieRepository;
 
+    // ====================================================================
+    // ENDPOINTS DE DÉCLENCHEMENT ET DE CONSULTATION
+    // ====================================================================
+
     @PostMapping("/detecter/{jour}")
     public ResponseEntity<String> declencherDetectionAnomalies(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate jour) {
         anomalieDetectionService.lancerDetectionPourTous(jour);
         return ResponseEntity.ok("Détection des anomalies lancée avec succès pour le " + jour);
     }
-
-    // --- VUES POUR LE ROLE RH ---
 
     @GetMapping("/rh/en-attente")
     public List<AnomalieDto> getAnomaliesEnAttentePourRH() {
@@ -56,71 +58,68 @@ public class AnomalieController {
                 .collect(Collectors.toList());
     }
     
-    // --- VUE PAR NOEUD (pour le Manager de ce noeud) ---
-
-    /**
-     * Récupère les anomalies en attente pour un noeud hiérarchique spécifique (service, département...).
-     * C'est l'endpoint que le manager d'un service utilisera.
-     * @param noeudId L'ID du noeud hiérarchique.
-     */
     @GetMapping("/noeud/{noeudId}/en-attente")
     public List<AnomalieDto> getAnomaliesEnAttentePourNoeud(@PathVariable Integer noeudId) {
-        // On utilise la nouvelle méthode du repository qui filtre par l'ID du noeud.
         List<Anomalie> anomalies = anomalieRepository.findByNoeudConcerneIdAndStatut(noeudId, StatutAnomalie.EN_ATTENTE);
         return anomalies.stream()
                 .map(AnomalieMapper::toAnomalieDto)
                 .collect(Collectors.toList());
     }
 
-
-    // --- ACTIONS DE VALIDATION (par un Manager ou RH) ---
-
-    @PostMapping("/{id}/valider")
-    public ResponseEntity<?> validerAnomalie(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
-        String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
-        Optional<Anomalie> resultat = anomalieWorkflowService.validerAnomalie(id, commentaire);
-        
-        if (resultat.isPresent()) {
-            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Anomalie non trouvée ou statut invalide pour l'ID : " + id);
-        }
-    }
-
-    @PostMapping("/{id}/rejeter")
-    public ResponseEntity<?> rejeterAnomalie(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
-        String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
-        Optional<Anomalie> resultat = anomalieWorkflowService.rejeterAnomalie(id, commentaire);
-        
-        if (resultat.isPresent()) {
-            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Anomalie non trouvée ou statut invalide pour l'ID : " + id);
-        }
-    }
+    // ====================================================================
+    // ENDPOINTS D'ACTION DU MANAGER SUR LES SUGGESTIONS DE L'IA
+    // ====================================================================
     
+    /**
+     * Accepte la suggestion de l'IA pour une anomalie.
+     * L'action dépend du type d'anomalie (ex: ajoute un pointage pour une omission, valide un retard, etc.).
+     */
     @PostMapping("/{id}/accepter-suggestion")
-    public ResponseEntity<?> accepterSuggestion(@PathVariable Long id) {
+    public ResponseEntity<AnomalieDto> accepterSuggestion(@PathVariable Long id) {
         Optional<Anomalie> resultat = suggestionActionService.accepterSuggestion(id);
         
-        if (resultat.isPresent()) {
-            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Impossible d'appliquer la suggestion pour l'anomalie ID : " + id);
-        }
+        return resultat.map(anomalie -> ResponseEntity.ok(AnomalieMapper.toAnomalieDto(anomalie)))
+                .orElse(ResponseEntity.status(HttpStatus.BAD_REQUEST).build());
+    }
+
+    
+
+    /**
+     * Valide manuellement une anomalie, sans tenir compte de la suggestion IA.
+     * C'est une action de forçage par le RH ou le manager.
+     */
+    @PostMapping("/{id}/valider-manuellement")
+    public ResponseEntity<AnomalieDto> validerAnomalieManuellement(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+    String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
+        Optional<Anomalie> resultat = anomalieWorkflowService.validerAnomalie(id, commentaire);
+        
+        return resultat.map(anomalie -> ResponseEntity.ok(AnomalieMapper.toAnomalieDto(anomalie)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    /**
+     * Rejette manuellement une anomalie, sans tenir compte de la suggestion IA.
+     */
+    @PostMapping("/{id}/rejeter-manuellement")
+    public ResponseEntity<AnomalieDto> rejeterAnomalieManuellement(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+    String commentaire = (payload != null) ? payload.getOrDefault("commentaire", "") : "";
+        Optional<Anomalie> resultat = anomalieWorkflowService.rejeterAnomalie(id, commentaire);
+        
+        return resultat.map(anomalie -> ResponseEntity.ok(AnomalieMapper.toAnomalieDto(anomalie)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
     
+    /**
+     * Permet de corriger manuellement une omission de pointage en fournissant l'heure.
+     */
     @PostMapping("/{id}/corriger-manuellement")
-    public ResponseEntity<?> corrigerAnomalieManuellement(
+    public ResponseEntity<AnomalieDto> corrigerAnomalieManuellement(
             @PathVariable Long id,
             @RequestBody CorrectionPayload payload) {
         
         Optional<Anomalie> resultat = anomalieWorkflowService.corrigerManuellement(id, payload.getHeureCorrigee(), payload.getCommentaire());
         
-        if (resultat.isPresent()) {
-            return ResponseEntity.ok(AnomalieMapper.toAnomalieDto(resultat.get()));
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Impossible de corriger l'anomalie. Vérifiez l'ID, le statut, le type (OMISSION_POINTAGE) et le format de l'heure (HH:mm).");
-        }
+        return resultat.map(anomalie -> ResponseEntity.ok(AnomalieMapper.toAnomalieDto(anomalie)))
+                .orElse(ResponseEntity.status(HttpStatus.BAD_REQUEST).build());
     }
 }

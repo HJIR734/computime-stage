@@ -3,5 +3,6 @@ public enum StatutAnomalie {
     EN_ATTENTE,
     VALIDEE,
     REJETEE,
-    RESOLUE
+    RESOLUE,
+    REFUSEE
 }
