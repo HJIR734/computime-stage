@@ -2,9 +2,11 @@ package ma.computime.anomalydetector.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import ma.computime.anomalydetector.entity.Noeud;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
@@ -57,4 +59,11 @@ public class Employe {
 
     @Column(name = "SOLDE_ANNUEL")
     private Double soldeConges;
+
+    @ManyToOne
+    @JoinColumn(name = "PROFIL_METIER_FK") // C'est la colonne de la table 'utilisateur' qui fait le lien
+    private ProfilMetier profilMetier;
+
+    
+    
 }

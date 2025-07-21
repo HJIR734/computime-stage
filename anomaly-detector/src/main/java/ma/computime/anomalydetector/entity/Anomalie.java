@@ -43,6 +43,18 @@ public class Anomalie {
     @Column(name = "suggestion_correction")
     private String suggestion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_responsable_id", nullable = true)
+    private Employe managerResponsable;
+
+    // Pour savoir quand le manager a traité l'anomalie.
+    @Column(name = "date_traitement")
+    private LocalDateTime dateTraitement;
+
+    // Pour que le manager puisse laisser un commentaire.
+    @Column(name = "commentaire_manager", length = 500)
+    private String commentaireManager;
+
     // ====================================================================
     // === CHAMPS DÉDIÉS AUX SUGGESTIONS DE L'IA - VERSION COMPLÈTE ===
     // ====================================================================

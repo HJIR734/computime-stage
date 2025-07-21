@@ -30,4 +30,16 @@ public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
         @Param("statut") StatutAnomalie statut, 
         @Param("year") int year
     );
+
+    List<Anomalie> findByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
+
+    // Compte les anomalies EN_ATTENTE pour un manager spécifique.
+    long countByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
+
+    // Trouve toutes les anomalies pour une période donnée, triées par date.
+    List<Anomalie> findByJourAnomalieBetweenOrderByJourAnomalieDesc(LocalDate dateDebut, LocalDate dateFin);
+
+    List<Anomalie> findByManagerResponsableIdAndStatutNot(Integer managerId, StatutAnomalie statut);
+
+    
 }

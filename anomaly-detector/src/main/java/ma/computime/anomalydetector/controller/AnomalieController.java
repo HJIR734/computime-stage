@@ -7,6 +7,7 @@ import ma.computime.anomalydetector.dto.CorrectionPayload;
 import ma.computime.anomalydetector.entity.Anomalie;
 import ma.computime.anomalydetector.entity.StatutAnomalie;
 import ma.computime.anomalydetector.repository.AnomalieRepository;
+import ma.computime.anomalydetector.repository.EmployeRepository;
 import ma.computime.anomalydetector.service.AnomalieDetectionService;
 import ma.computime.anomalydetector.service.AnomalieWorkflowService;
 import ma.computime.anomalydetector.service.SuggestionActionService;
@@ -18,8 +19,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -30,6 +29,7 @@ public class AnomalieController {
     @Autowired private AnomalieWorkflowService anomalieWorkflowService;
     @Autowired private SuggestionActionService suggestionActionService;
     @Autowired private AnomalieRepository anomalieRepository;
+    @Autowired private EmployeRepository employeRepository;
 
     // ====================================================================
     // ENDPOINTS DE DÉCLENCHEMENT ET DE CONSULTATION
@@ -66,6 +66,47 @@ public class AnomalieController {
                 .collect(Collectors.toList());
     }
 
+    // Dans AnomalieController.java
+
+// ... (après la méthode getAnomaliesEnAttentePourNoeud)
+
+// ====================================================================
+// ENDPOINTS POUR LE DASHBOARD PERSONNEL DU MANAGER (VERSION CORRIGÉE)
+// ====================================================================
+
+/**
+ * Renvoie le NOMBRE d'anomalies en attente assignées à un manager spécifique.
+ * C'est pour la "notification" dans le menu (ex: "Anomalies à traiter (5)").
+ * URL de test : /api/anomalies/manager/465/en-attente/count
+ */
+@GetMapping("/manager/{managerId}/en-attente/count")
+public long getNombreAnomaliesPourManager(@PathVariable Integer managerId) {
+    // ON UTILISE DIRECTEMENT TA MÉTHODE EXISTANTE
+    // Pas besoin de chercher l'employé d'abord. C'est plus efficace.
+    return anomalieRepository.countByManagerResponsableIdAndStatut(managerId, StatutAnomalie.EN_ATTENTE);
+}
+
+/**
+ * Renvoie la LISTE des anomalies en attente assignées à un manager spécifique.
+ * C'est pour afficher la page détaillée que le manager doit traiter.
+ * URL de test : /api/anomalies/manager/465/en-attente
+ */
+@GetMapping("/manager/{managerId}/en-attente")
+public List<AnomalieDto> getAnomaliesPourManager(@PathVariable Integer managerId) {
+    // ON UTILISE DIRECTEMENT TA MÉTHODE EXISTANTE
+    List<Anomalie> anomalies = anomalieRepository.findByManagerResponsableIdAndStatut(managerId, StatutAnomalie.EN_ATTENTE);
+    
+    // On convertit la liste en DTOs
+    return anomalies.stream()
+            .map(AnomalieMapper::toAnomalieDto)
+            .collect(Collectors.toList());
+}
+
+
+// (Ici commence la section "ENDPOINTS D'ACTION DU MANAGER...")
+
+
+// (Ici commence la section "ENDPOINTS D'ACTION DU MANAGER...")
     // ====================================================================
     // ENDPOINTS D'ACTION DU MANAGER SUR LES SUGGESTIONS DE L'IA
     // ====================================================================

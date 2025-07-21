@@ -22,5 +22,5 @@ public class Noeud {
     // Un noeud peut avoir un noeud parent (la hiérarchie)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "NOEUD_FK")
-    private Noeud parent;
+    private Noeud noeudParent;
 }
