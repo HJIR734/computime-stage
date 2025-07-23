@@ -44,9 +44,10 @@ Les deux services sont lancés et mis en réseau automatiquement par **Docker Co
 
 ```mermaid
 graph TD;
-    A[Utilisateur via Postman] -->|"1. Requête API REST<br/>(localhost:8080)"| B[Service Détection<br/>Java / Spring Boot<br/>(Conteneur Docker)];
-    B -->|"2. Lecture/Écriture Données<br/>(JDBC)"| D[Base de Données<br/>MySQL<br/>(Tourne sur le PC Hôte)];
-    B -->|"3. Appel Prédiction IA<br/>(API REST sur host.docker.internal:5001)"| C[Service IA<br/>Python / Flask<br/>(Conteneur Docker)];
+    A[Utilisateur via Postman] -->|1. Requête API REST\n(localhost:8080)| B[Service Détection\nJava / Spring Boot\n(Conteneur Docker)];
+    B -->|2. Lecture/Écriture Données\n(JDBC)| D[Base de Données\nMySQL\n(Tourne sur le PC Hôte)];
+    B -->|3. Appel Prédiction IA\n(API REST sur host.docker.internal:5001)| C[Service IA\nPython / Flask\n(Conteneur Docker)];
+
 ```
 
 ---
