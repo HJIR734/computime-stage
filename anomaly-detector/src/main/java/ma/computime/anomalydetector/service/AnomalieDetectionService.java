@@ -6,11 +6,15 @@ import ma.computime.anomalydetector.dto.IaSuggestionResponse;
 import ma.computime.anomalydetector.dto.PredictionAbsenceResponse;
 import ma.computime.anomalydetector.dto.PredictionResponse;
 import ma.computime.anomalydetector.entity.*;
+import ma.computime.anomalydetector.repository.AbsenceRepository;
 import ma.computime.anomalydetector.repository.AnomalieRepository;
+import ma.computime.anomalydetector.repository.CongeRepository;
 import ma.computime.anomalydetector.repository.EmployeRepository;
 import ma.computime.anomalydetector.repository.JourFerieRepository;
 import ma.computime.anomalydetector.repository.PlanningExceptionRepository;
 import ma.computime.anomalydetector.repository.PointageRepository;
+import ma.computime.anomalydetector.repository.RecuperationRepository;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +45,9 @@ public class AnomalieDetectionService {
     @Autowired private JourFerieRepository jourFerieRepository;
     @Autowired private RestClient restClient;
     @Autowired private PlanningExceptionRepository planningExceptionRepository;
+    @Autowired private RecuperationRepository recuperationRepository;
+    @Autowired private AbsenceRepository absenceRepository;
+    @Autowired private CongeRepository congeRepository;
     
 
     @Transactional
@@ -117,7 +124,6 @@ public void lancerDetectionPourTous(LocalDate jour) {
                 detecterRetard(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
                 detecterSortieAnticipeeAvecIA(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
                 detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
-                detecterPauseTropLongue(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
             }
         } else {
              logger.warn("Aucun horaire défini pour {} dans le planning actif ID {} pour l'employé {}.",
@@ -219,94 +225,115 @@ private void creerEtSauverAnomalie(Employe employe, LocalDate jour, TypeAnomalie
     // MÉTHODES DE DÉTECTION SPÉCIFIQUES (CORRIGÉES ET COHÉRENTES)
     // =================================================================================
 
-    private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour, List<Pointage> pointages, Planning planning, Optional<Employe> managerOpt) {
-        if (pointages.isEmpty()) return false;
+    // DANS AnomalieDetectionService.java
+// REMPLACE toute ta méthode detecterTravailJourNonTravaille par celle-ci.
+
+private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour, List<Pointage> pointages, Planning planning, Optional<Employe> managerOpt) {
+    if (pointages.isEmpty()) return false;
+
+    String typeJourNonTravaille = null;
+    TypeAnomalie typeAnomalie = null;
+
+    if (jourFerieRepository.existsByDate(jour)) {
+        typeJourNonTravaille = "FERIE";
+        typeAnomalie = TypeAnomalie.TRAVAIL_JOUR_FERIE;
+    } else {
+        if (planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isEmpty()) {
+            typeJourNonTravaille = "REPOS";
+            typeAnomalie = TypeAnomalie.TRAVAIL_JOUR_REPOS;
+        }
+    }
     
-        String typeJourNonTravaille = null;
-        TypeAnomalie typeAnomalie = null;
-    
-        if (jourFerieRepository.existsByDate(jour)) {
-            typeJourNonTravaille = "FERIE";
-            typeAnomalie = TypeAnomalie.TRAVAIL_JOUR_FERIE;
-        } else {
-            // L'erreur "Duplicate local variable" était ici. On utilise directement le 'planning' reçu en argument.
-            if (planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isEmpty()) {
-                typeJourNonTravaille = "REPOS";
-                typeAnomalie = TypeAnomalie.TRAVAIL_JOUR_REPOS;
-            }
+    if (typeJourNonTravaille != null && typeAnomalie != null) {
+        
+        // ======================== NOUVELLE LOGIQUE ========================
+        // Avant de créer une anomalie, on vérifie si ce travail est une récupération planifiée.
+        boolean estUneRecuperationValidee = recuperationRepository.existsByEmployeAndDateRecuperationAndStatutValidee(employe, jour);
+        
+        if (estUneRecuperationValidee) {
+            logger.info("Travail le {} détecté pour l'employé {}, mais il s'agit d'une récupération validée. Aucune anomalie générée.", jour, employe.getBadge());
+            return true; // On retourne true pour indiquer que le "cas" a été traité et qu'il ne faut pas continuer.
+        }  
+        // ====================== FIN DE LA NOUVELLE LOGIQUE ======================
+
+
+        if (pointages.size() < 2) {
+            String message = "Pointage unique détecté un " + typeJourNonTravaille + ".";
+            creerEtSauverAnomalie(employe, jour, typeAnomalie, message, "Pointage à vérifier ou supprimer.", null, 0L, managerOpt);
+            return true;
         }
         
-        if (typeJourNonTravaille != null && typeAnomalie != null) {
-            if (pointages.size() < 2) {
-                String message = "Pointage unique détecté un " + typeJourNonTravaille + ".";
-                creerEtSauverAnomalie(employe, jour, typeAnomalie, message, "Pointage à vérifier ou supprimer.", null, 0L, managerOpt);
-                return true;
-            }
-            
-            long dureeTravailleeMinutes = Duration.between(pointages.get(0).getDateMouvement(), pointages.get(pointages.size() - 1).getDateMouvement()).toMinutes();
-            double dureeTravailleeHeures = dureeTravailleeMinutes / 60.0;
-            double soldeReposActuelHeures = 1.5; 
-    
-            Map<String, Object> context = new HashMap<>();
-            context.put("type_jour", typeJourNonTravaille);
-            context.put("duree_travaillee_heures", dureeTravailleeHeures);
-            context.put("solde_repos_actuel_heures", soldeReposActuelHeures);
-    
-            String suggestionTexte = callIaService("/predict/compensation", context, "prédiction de compensation");
-            String message = String.format("Pointages détectés un %s. Durée travaillée: %.2f heures.", typeJourNonTravaille, dureeTravailleeHeures);
-            creerEtSauverAnomalie(employe, jour, typeAnomalie, message, suggestionTexte, null, dureeTravailleeMinutes, managerOpt);
-            return true; 
-        }
-        return false;
+        long dureeTravailleeMinutes = Duration.between(pointages.get(0).getDateMouvement(), pointages.get(pointages.size() - 1).getDateMouvement()).toMinutes();
+        double dureeTravailleeHeures = dureeTravailleeMinutes / 60.0;
+        double soldeReposActuelHeures = 1.5; 
+
+        Map<String, Object> context = new HashMap<>();
+        context.put("type_jour", typeJourNonTravaille);
+        context.put("duree_travaillee_heures", dureeTravailleeHeures);
+        context.put("solde_repos_actuel_heures", soldeReposActuelHeures);
+
+        String suggestionTexte = callIaService("/predict/compensation", context, "prédiction de compensation");
+        String message = String.format("Pointages détectés un %s. Durée travaillée: %.2f heures.", typeJourNonTravaille, dureeTravailleeHeures);
+        creerEtSauverAnomalie(employe, jour, typeAnomalie, message, suggestionTexte, null, dureeTravailleeMinutes, managerOpt);
+        return true; 
     }
+    return false;
+}
 
     // Dans AnomalieDetectionService.java
 
 // Dans AnomalieDetectionService.java
 
+// DANS AnomalieDetectionService.java
+// REMPLACE toute ta méthode detecterAbsenceInjustifiee par celle-ci.
+
+// DANS AnomalieDetectionService.java
+// REMPLACE la méthode detecterAbsenceInjustifiee par cette version finale.
+
 private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour, Planning planning, Optional<Employe> managerOpt) {
-        // Vérifie si l'employé devait travailler ce jour-là
-        boolean devaitTravailler = planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isPresent();
-        
-        if (devaitTravailler) {
-            // --- LOGIQUE IA AVEC VRAIES DONNÉES ---
-            
-            // 1. Collecter le contexte RÉEL depuis la base de données
-            Map<String, Object> context = new HashMap<>();
+    boolean devaitTravailler = planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isPresent();
+    
+    if (devaitTravailler) {
 
-            // Feature 1: Durée de l'absence (pour l'instant, on détecte au jour le jour)
-            context.put("duree_absence_jours", 1); // AJOUTÉ : C'est une feature attendue par le modèle
+        // ======================== VERSION FINALE DE LA LOGIQUE ========================
+        // On vérifie si l'absence est justifiée SOIT par une demande d'absence, SOIT par un congé.
+        boolean estUneAbsenceValidee = absenceRepository.existsByEmployeAndJourCouvertAndStatutValidee(employe, jour);
+        boolean estUnCongeValide = congeRepository.existsByEmployeAndJourCouvertAndStatutValidee(employe, jour);
 
-            // Feature 2: Solde de congés actuel de l'employé
-            double soldeConges = employe.getSoldeConges() != null ? employe.getSoldeConges() : 0.0;
-            context.put("solde_conges_jours", soldeConges); // MODIFIÉ : Utilise la vraie valeur
-
-            // Feature 3: Nombre d'absences injustifiées déjà validées cette année
-            long nbAbsencesAnnee = anomalieRepository.countByEmployeAndTypeAnomalieAndStatutInYear(
-                employe, 
-                TypeAnomalie.ABSENCE_INJUSTIFIEE, 
-                StatutAnomalie.VALIDEE,
-                jour.getYear()
-            );
-            context.put("nb_absences_injustifiees_annee", nbAbsencesAnnee); // MODIFIÉ : Utilise un vrai appel DB
-
-            // Feature 4: Vérifier si l'absence est collée à un week-end ou jour férié
-            boolean estAdjacentWeekend = jour.getDayOfWeek() == DayOfWeek.MONDAY || jour.getDayOfWeek() == DayOfWeek.FRIDAY;
-            boolean estAdjacentFerie = jourFerieRepository.existsByDate(jour.minusDays(1)) || jourFerieRepository.existsByDate(jour.plusDays(1));
-            context.put("est_adjacent_weekend_ferie", (estAdjacentWeekend || estAdjacentFerie) ? 1 : 0); // MODIFIÉ : Logique plus complète
-
-            // Feature 5: Charge de l'équipe (on garde la simulation pour celle-ci)
-            context.put("charge_equipe", 0.7); // MODIFIÉ : Nom de feature aligné sur le modèle
-
-            // 2. Appeler l'IA avec le contexte réel
-            String suggestionTexte = callIaService("/predict/absence-injustifiee", context, "prédiction d'absence");
-            
-            // 3. Créer l'anomalie avec la suggestion de l'IA
-            String message = "Aucun pointage détecté pour une journée de travail planifiée.";
-            
-            creerEtSauverAnomalie(employe, jour, TypeAnomalie.ABSENCE_INJUSTIFIEE, message, suggestionTexte, null, null, managerOpt);
+        if (estUneAbsenceValidee || estUnCongeValide) { // <-- LA MODIFICATION EST ICI (||)
+            String justification = estUneAbsenceValidee ? "une demande d'absence" : "un congé";
+            logger.info("Absence le {} détectée pour l'employé {}, mais elle est couverte par {}. Aucune anomalie générée.", jour, employe.getBadge(), justification);
+            return; 
         }
+        // ====================== FIN DE LA LOGIQUE FINALE ======================
+
+        // Si on arrive ici, l'absence n'est justifiée NI par une absence, NI par un congé.
+        // On continue le processus de création d'anomalie.
+        
+        // ... (le reste du code avec l'appel à l'IA ne change pas)
+        Map<String, Object> context = new HashMap<>();
+        context.put("duree_absence_jours", 1);
+        double soldeConges = employe.getSoldeConges() != null ? employe.getSoldeConges() : 0.0;
+        context.put("solde_conges_jours", soldeConges);
+        long nbAbsencesAnnee = anomalieRepository.countByEmployeAndTypeAnomalieAndStatutInYear(
+            employe, 
+            TypeAnomalie.ABSENCE_INJUSTIFIEE, 
+            StatutAnomalie.VALIDEE,
+            jour.getYear()
+        );
+        context.put("nb_absences_injustifiees_annee", nbAbsencesAnnee);
+        boolean estAdjacentWeekend = jour.getDayOfWeek() == DayOfWeek.MONDAY || jour.getDayOfWeek() == DayOfWeek.FRIDAY;
+        boolean estAdjacentFerie = jourFerieRepository.existsByDate(jour.minusDays(1)) || jourFerieRepository.existsByDate(jour.plusDays(1));
+        context.put("est_adjacent_weekend_ferie", (estAdjacentWeekend || estAdjacentFerie) ? 1 : 0);
+        context.put("charge_equipe", 0.7);
+
+        String suggestionTexte = callIaService("/predict/absence-injustifiee", context, "prédiction d'absence");
+        
+        String message = "Aucun pointage détecté pour une journée de travail planifiée.";
+        
+        creerEtSauverAnomalie(employe, jour, TypeAnomalie.ABSENCE_INJUSTIFIEE, message, suggestionTexte, null, null, managerOpt);
     }
+}
 
     private void detecterSortieAnticipeeAvecIA(Employe employe, LocalDate jour, List<Pointage> pointagesDuJour, Horaire horaireDuJour, Optional<Employe> managerOpt) {
         LocalTime heureFinTheorique = horaireDuJour.getHeureFinTheorique();
@@ -430,20 +457,6 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
     }
 }
 
-    private void detecterPauseTropLongue(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire, Optional<Employe> managerOpt) {
-        if (pointages.size() < 4) return;
-        Integer dureePauseAutorisee = Optional.ofNullable(horaire.getDureeTotalePauseMinutes()).orElse(0);
-        if (dureePauseAutorisee <= 0) return;
-        for (int i = 1; i < pointages.size() - 1; i += 2) {
-            long dureePauseEffectiveMinutes = Duration.between(pointages.get(i).getDateMouvement(), pointages.get(i + 1).getDateMouvement()).toMinutes();
-            if (dureePauseEffectiveMinutes > dureePauseAutorisee) {
-                long depassement = dureePauseEffectiveMinutes - dureePauseAutorisee;
-                String message = String.format("Pause de %d minutes détectée (dépassement de %d min). Autorisée: %d min.", dureePauseEffectiveMinutes, depassement, dureePauseAutorisee);
-                creerEtSauverAnomalie(employe, jour, TypeAnomalie.PAUSE_TROP_LONGUE, message, "Validation requise.", null, depassement, managerOpt);
-                break; 
-            }
-        }
-    }
     
     private String callIaService(String uri, Map<String, Object> requestBody, String logContext) {
         try {
