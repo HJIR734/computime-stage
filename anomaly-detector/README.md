@@ -41,15 +41,7 @@ L'écosystème est composé de deux services conteneurisés conçus pour fonctio
     *   Expose des endpoints REST (ex: `/predict/retard`) pour fournir des prédictions et des suggestions intelligentes.
 
 Les deux services sont lancés et mis en réseau automatiquement par **Docker Compose**.
-
-```mermaid
-graph TD
-    A[Utilisateur via Postman] -->|1. Requete API REST\n(localhost:8080)| B[Service Detection\nJava / Spring Boot\n(Conteneur Docker)]
-    B -->|2. Lecture/Ecriture Donnees\n(JDBC)| D[Base de Donnees\nMySQL\n(Tourne sur le PC Hote)]
-    B -->|3. Appel Prediction IA\n(API REST sur host.docker.internal:5001)| C[Service IA\nPython / Flask\n(Conteneur Docker)]
-
-
-```
+![Schéma d'Architecture](./docs/images/architectureee.png)
 
 ---
 
