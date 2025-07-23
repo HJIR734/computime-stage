@@ -1,0 +1,24 @@
+# Utiliser une image Python légère
+FROM python:3.9-slim
+
+RUN apt-get update && apt-get install -y libgomp1
+
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier le fichier des dépendances
+COPY requirements.txt .
+
+# Installer les dépendances
+RUN pip install --no-cache-dir -r requirements.txt
+
+#LIGNE POUR COPIER LES MODÈLES
+COPY models/ ./models/
+
+# Copier le code de l'application
+COPY app.py .
+
+# Exposer le port et lancer l'application
+EXPOSE 5001
+CMD ["python", "-u", "app.py"]

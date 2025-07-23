@@ -15,3 +15,7 @@ joblib
 
 # Pour la connexion à la base de données
 mysql-connector-python
+
+shap
+
+lightgbm

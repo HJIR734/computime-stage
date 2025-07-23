@@ -1,0 +1,23 @@
+
+
+services:
+  # Service N°1 : Notre application Java (le détecteur d'anomalies)
+  java-app:
+    build: . # Construit l'image en utilisant le Dockerfile du dossier courant
+    container_name: anom-detector-java
+    ports:
+      - "8080:8080" # Connecte le port 8080 du PC au port 8080 du conteneur
+    environment:
+      # On passe les variables d'environnement pour qu'il utilise le profil docker
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - python-ai # Attend que le service python démarre avant de se lancer
+
+  # Service N°2 : Notre service d'IA en Python
+  python-ai:
+    build:
+      context: . # Utilise le dossier courant comme contexte
+      dockerfile: Dockerfile.python # Utilise un Dockerfile spécifique pour Python
+    container_name: anom-detector-python
+    ports:
+      - "5001:5001" # Connecte le port 5001 du PC au port 5001 du conteneur

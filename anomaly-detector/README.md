@@ -1,105 +1,117 @@
-# Microservice de Détection d'Anomalies RH
+# Microservice de Détection d'Anomalies RH avec IA
 
-Ce projet est un microservice intelligent développé avec **Spring Boot** (Java) et **Flask** (Python) dans le cadre d'un stage chez COMPUTIME. Son objectif est de détecter, analyser et proposer des solutions pour diverses anomalies de pointage du personnel, en s'appuyant sur des modèles de Machine Learning.
+Ce projet est un écosystème de microservices intelligent développé avec **Spring Boot (Java)** et **Flask (Python)** dans le cadre d'un stage chez COMPUTIME. Son objectif est de détecter, d'analyser et de proposer des solutions pour diverses anomalies de pointage du personnel, en s'appuyant sur des modèles de Machine Learning.
+
+L'ensemble de l'application est **conteneurisé avec Docker** et orchestré via **Docker Compose**, permettant un lancement complet et reproductible avec une seule commande.
 
 ---
 
 ##  Fonctionnalités Principales
 
-Le service est capable de détecter automatiquement les anomalies suivantes :
+Le service applique une logique métier avancée pour fournir une détection d'anomalies contextuelle et intelligente :
 
-*    **Omission de Pointage** : Détecte les journées avec un nombre impair de pointages et propose une heure de correction via un modèle de régression (LightGBM).
-*    **Retard à l'arrivée** : Identifie les arrivées après l'heure théorique et utilise un modèle de classification (LightGBM) pour suggérer une action.
-*    **Sortie Anticipée** : Identifie les départs avant l'heure théorique.
-*    **Heures Supplémentaires non autorisées** : Calcule le temps de travail dépassant la durée théorique et utilise un modèle de classification pour suggérer une décision (Accepter/Rejeter).
-*    **Absence Injustifiée** : Détecte les jours où un employé aurait dû travailler mais n'a aucun pointage.
-*    **Travail un Jour Férié / de Repos** : Identifie les pointages sur des jours non travaillés.
+*    **Analyse Contextuelle Intelligente** : Avant de générer une anomalie pour une absence, le système vérifie systématiquement si la journée est couverte par une **justification valide** (congé, absence autorisée, récupération, exception de planning). Une anomalie n'est créée qu'en dernier recours.
 
-Le système propose également un **workflow de validation** simple via une API REST, permettant à un superviseur de valider ou de rejeter les anomalies détectées.
+*   **Omission de Pointage** : Détecte les journées avec un nombre impair de pointages et fait appel à l'IA pour proposer une heure de correction pertinente.
+
+*   **Retard à l'arrivée / Sortie Anticipée** : Identifie les pointages ne respectant pas les plages horaires prévues (en tenant compte des tolérances) et demande à l'IA une suggestion d'action.
+
+*   **Heures Supplémentaires non autorisées** : Calcule le temps de travail dépassant la durée théorique et utilise l'IA pour suggérer une décision (Accepter/Rejeter) basée sur le contexte.
+
+*   **Travail un Jour de Repos / Férié** : Identifie les pointages effectués sur des jours non travaillés selon le planning de l'employé ou le calendrier des jours fériés.
+
+*   **Absence Injustifiée** : Détecte les jours où un employé aurait dû travailler mais n'a aucun pointage (et après avoir vérifié qu'aucune justification n'existe). L'IA est ensuite consultée pour évaluer le risque.
+
+*    **Prédiction d'Absences Futures** : Utilise les données historiques pour prédire la probabilité d'absence d'un employé dans les jours à venir, aidant ainsi à la planification proactive.
 
 ---
 
 ##  Architecture Technique
 
-L'écosystème est composé de deux services indépendants :
+L'écosystème est composé de deux services conteneurisés conçus pour fonctionner ensemble :
 
-1.  **Service de Détection (Java / Spring Boot)** :
+1.  **Service de Détection (`java-app`)** :
+    *   Développé en **Java / Spring Boot**.
     *   Responsable de la logique métier, de la communication avec la base de données (MySQL), et de l'exposition des API REST pour la gestion des anomalies.
-    *   C'est lui qui orchestre les appels vers le service d'IA.
+    *   Orchestre les appels vers le service d'IA pour enrichir les anomalies.
 
-2.  **Service d'IA (Python / Flask)** :
-    *   Responsable de servir les modèles de Machine Learning (entraînés avec LightGBM).
+2.  **Service d'IA (`python-ai`)** :
+    *   Développé en **Python / Flask**.
+    *   Responsable de servir les modèles de Machine Learning (entraînés avec `scikit-learn` et `lightgbm`).
     *   Expose des endpoints REST (ex: `/predict/retard`) pour fournir des prédictions et des suggestions intelligentes.
+
+Les deux services sont lancés et mis en réseau automatiquement par **Docker Compose**.
+
+```mermaid
+graph TD;
+    A[Utilisateur via Postman] -->|1. Requête API REST<br/>(localhost:8080)| B[Service Détection<br/>Java / Spring Boot<br/>(Conteneur Docker)];
+    B -->|2. Lecture/Écriture Données<br/>(JDBC)| D[Base de Données<br/>MySQL<br/>(Tourne sur le PC Hôte)];
+    B -->|3. Appel Prédiction IA<br/>(API REST sur host.docker.internal:5001)| C[Service IA<br/>Python / Flask<br/>(Conteneur Docker)];
+```
 
 ---
 
 ##  Prérequis
 
-*   [Java 17](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html) ou supérieur
-*   [Maven](https://maven.apache.org/download.cgi)
-*   [MySQL Server](https://dev.mysql.com/downloads/mysql/)
-*   [Python 3.9](https://www.python.org/downloads/) ou supérieur
-*   Un client API comme [Postman](https://www.postman.com/downloads/)
+Pour lancer ce projet, vous n'avez besoin que des outils suivants installés sur votre machine :
+
+*   [**Git**](https://git-scm.com/)
+*   [**Docker Desktop**](https://www.docker.com/products/docker-desktop/)
+*   [**MySQL Server**](https://dev.mysql.com/downloads/mysql/) (ou tout autre serveur MySQL accessible)
+
+*Note : Il n'est PAS nécessaire d'installer Java, Maven ou Python sur la machine hôte. Docker s'occupe de tout.*
 
 ---
 
-##  Guide de Lancement
+##  Guide de Lancement Rapide
 
-Suivez ces étapes pour lancer le projet en local.
+Lancer l'intégralité de l'écosystème se fait en 3 étapes simples.
 
 ### 1. Base de Données
 
-1.  Assurez-vous que votre serveur MySQL est en marche.
+1.  Assurez-vous que votre serveur MySQL est démarré.
 2.  Créez une base de données (schema) nommée `sicda_easytime`.
 3.  Importez les scripts SQL fournis pour créer les tables et insérer les données.
-4.  Ouvrez le fichier `src/main/resources/application.properties` du projet Java et mettez à jour les informations de connexion à la base de données si nécessaire :
-    ```properties
-    spring.datasource.url=jdbc:mysql://localhost:3306/sicda_easytime
-    spring.datasource.username=root
-    spring.datasource.password=root
-    ```
 
-### 2. Service d'IA (Python)
+### 2. Récupération du Projet
 
-1.  Naviguez vers le dossier contenant le projet Python (où se trouve `app.py`).
-2.  Il est recommandé de créer un environnement virtuel :
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # Sur Windows: venv\Scripts\activate
-    ```
-3.  Installez les dépendances nécessaires :
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *(Note : Pensez à créer un fichier `requirements.txt` avec le contenu `Flask`, `joblib`, `pandas`, `numpy`, `scikit-learn`, `lightgbm`)*
-4.  Lancez le serveur Flask :
-    ```bash
-    python app.py
-    ```
-    Le serveur devrait démarrer sur le port 5000 et charger les modèles `.pkl`.
+Clonez ce dépôt sur votre machine locale :
+```bash
+git clone [URL_DE_VOTRE_DEPOT_GITHUB]
+cd anomaly-detector
+```
 
-### 3. Service de Détection (Java)
+### 3. Lancement avec Docker Compose
 
-1.  Ouvrez le projet `anomaly-detector` dans votre IDE (IntelliJ, VS Code...).
-2.  Lancez l'application en exécutant la classe principale `AnomalyDetectorApplication.java`.
-3.  Le serveur Spring Boot démarrera sur le port 8080.
+Depuis la racine du projet, lancez la commande suivante. **C'est la seule commande dont vous avez besoin.**
+
+```bash
+docker-compose up --build
+```
+
+Cette commande va automatiquement :
+1.  Construire l'image Docker pour le service Java.
+2.  Construire l'image Docker pour le service Python.
+3.  Démarrer les deux conteneurs et les connecter ensemble sur un réseau privé.
+
+Attendez que les logs se stabilisent et que vous voyiez les messages de démarrage des serveurs Java (Tomcat) et Python (Flask). L'application est maintenant prête !
+
+Pour tout arrêter proprement, ouvrez un autre terminal et lancez :
+```bash
+docker-compose down
+```
 
 ---
 
-##  Tester l'Application
+##  Documentation de l'API (Exemples)
 
-Vous pouvez maintenant utiliser Postman pour interagir avec l'API.
+Une fois l'application lancée, vous pouvez interagir avec elle via un client API comme Postman.
 
-**Exemple : Lancer une détection manuelle pour le 24 janvier 2023**
-*   **Méthode :** `POST`
-*   **URL :** `http://localhost:8080/api/anomalies/detecter/2023-01-24`
+| Objectif                                      | Méthode | URL                                                      |
+| --------------------------------------------- | ------- | -------------------------------------------------------- |
+| **Lancer une détection manuelle pour un jour**    | `POST`  | `http://localhost:8080/api/anomalies/detecter/{date}`      |
+| **Consulter les anomalies en attente**          | `GET`   | `http://localhost:8080/api/anomalies/en-attente`           |
+| **Valider une anomalie (ex: ID 7)**             | `POST`  | `http://localhost:8080/api/anomalies/7/valider`            |
+| **Prédire les absences pour les 15 prochains jours** | `GET`   | `http://localhost:8080/api/predictions/absences/15`        |
 
-**Consulter les anomalies en attente**
-*   **Méthode :** `GET`
-*   **URL :** `http://localhost:8080/api/anomalies/en-attente`
-
-**Valider une anomalie (ex: ID 7)**
-*   **Méthode :** `POST`
-*   **URL :** `http://localhost:8080/api/anomalies/7/valider`
-
----
+*(Remplacez `{date}` par une date au format `YYYY-MM-DD`)*.

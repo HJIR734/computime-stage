@@ -1,4 +1,4 @@
-package ma.computime.anomaly_detector;
+package ma.computime.anomalydetector;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
