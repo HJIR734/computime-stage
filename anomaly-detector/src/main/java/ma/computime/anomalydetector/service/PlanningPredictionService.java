@@ -38,7 +38,7 @@ public class PlanningPredictionService {
             for (LocalDate jour = dateDebut; !jour.isAfter(dateFin); jour = jour.plusDays(1)) {
                 
                 // 4. Appeler notre méthode existante pour obtenir la probabilité de l'IA
-                double probabilite = anomalieDetectionService.getAbsencePrediction(jour, employe);
+                double probabilite = anomalieDetectionService.getAbsencePrediction(jour, employe)* 100.0;
 
                 // 5. Transformer la probabilité en un niveau de risque
                 String risque = determinerNiveauRisque(probabilite);
@@ -60,8 +60,8 @@ public class PlanningPredictionService {
     
     private String determinerNiveauRisque(double probabilite) {
         if (probabilite < 0) return "Erreur"; // Cas où l'API IA n'a pas répondu
-        if (probabilite >= 0.15) return "Élevé";
-        if (probabilite >= 0.05) return "Moyen";
+        if (probabilite >= 15.0) return "Élevé";
+        if (probabilite >= 5.0) return "Moyen";
         return "Faible";
     }
 }

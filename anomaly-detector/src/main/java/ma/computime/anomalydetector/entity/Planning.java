@@ -25,7 +25,7 @@ public class Planning {
     private String type;
 
     @Column(name = "CATEGHRSP")
-    private Integer categorieHeuresSup;
+    private Integer categorieHeureSup;
 
     @Column(name = "DELTA_IN")
     private Integer deltaIn;

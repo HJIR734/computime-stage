@@ -79,19 +79,85 @@ def predict_entree():
     return jsonify({'suggestion_heure': heure_predite})
 
 # ... (tous tes autres endpoints : /overtime-context, /retard-context, etc. restent ici, inchangés)
+# Dans app.py
+
 @app.route('/predict/overtime-context', methods=['POST'])
 def predict_overtime_context():
     model_name = 'hs_contextuel'
-    if model_name not in models or model_name not in explainers: return jsonify({'erreur': 'Modèle HS non disponible.'}), 503
+    if model_name not in models or model_name not in explainers:
+        return jsonify({'erreur': 'Modèle HS non disponible.'}), 503
+
     data = request.get_json()
+
+    # ====================== DÉBUT DE LA MODIFICATION ======================
+
+    # Étape 1 : Extraire notre nouvelle feature du JSON reçu
+    mode_compensation_prefere = data.get('mode_compensation_prefere', 'PAYE') # 'PAYE' par défaut
+
+    # Préparer les données pour le modèle en s'assurant que toutes les features attendues sont là
+    # Le modèle actuel ne connaît pas 'mode_compensation_prefere', donc on ne le met pas dans 'input_df' pour l'instant.
+    # On va juste l'utiliser pour notre logique de décision.
     input_df = pd.DataFrame([data], columns=expected_features[model_name])
+
+    # Étape 2 : Faire la prédiction comme avant
     model = models[model_name]
     prediction_proba = model.predict_proba(input_df)[0]
     decision_index = np.argmax(prediction_proba)
-    decision = "ACCEPTER" if model.classes_[decision_index] == 1 else "REJETER"
     confiance = prediction_proba[decision_index]
-    justification_features = get_shap_based_justification(explainers[model_name], input_df, expected_features[model_name])
-    return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_features})
+
+    # La décision de base du modèle : 1 pour ACCEPTER, 0 pour REJETER
+    decision_base = "ACCEPTER" if model.classes_[decision_index] == 1 else "REJETER"
+
+    # Étape 3 : Logique de décision améliorée
+    # On affine la décision "ACCEPTER" en fonction du mode de compensation
+    final_decision = decision_base
+    if decision_base == "ACCEPTER":
+        if mode_compensation_prefere == "COMPENSE":
+            final_decision = "ACCEPTER ET COMPENSER"
+        else: # Si c'est "PAYE" ou une autre valeur
+            final_decision = "ACCEPTER ET PAYER"
+
+    # Étape 4 : Récupérer la justification comme avant
+    # ====================== DÉBUT DE LA MODIFICATION ======================
+    
+    # Étape 1 : Obtenir les features techniques importantes comme avant
+    justification_features_techniques = get_shap_based_justification(explainers[model_name], input_df, expected_features[model_name])
+    
+    # Étape 2 : Traduire ces features en phrases humaines
+    justification_humaine = []
+    for feature in justification_features_techniques:
+        valeur = data.get(feature, 0) # Obtenir la valeur de la feature
+        
+        if feature == 'hs_minutes':
+            if valeur > 180:
+                justification_humaine.append(f"La durée importante ({valeur} min) a été un facteur clé.")
+            else:
+                justification_humaine.append(f"La durée des heures sup ({valeur} min) a été analysée.")
+        
+        elif feature == 'nb_hs_validees_historique':
+            if valeur > 5:
+                justification_humaine.append(f"L'historique d'heures sup déjà validées ({valeur}) a influencé la décision.")
+            else:
+                justification_humaine.append("L'employé a un bon historique (peu d'heures sup passées).")
+                
+        elif feature == 'taux_absence_service':
+            if valeur > 0.3:
+                justification_humaine.append("Le taux d'absence élevé dans le service a été pris en compte.")
+            else:
+                justification_humaine.append("Le contexte de l'équipe a été considéré.")
+
+    if not justification_humaine:
+        justification_humaine.append("Suggestion basée sur l'analyse générale des données.")
+
+    # ======================= FIN DE LA MODIFICATION =======================
+    
+    
+    
+    return jsonify({
+        "decision": final_decision, # On renvoie notre décision affinée
+        "confiance": f"{confiance:.0%}", 
+        "justification": justification_humaine
+    })
 
 @app.route('/predict/retard-context', methods=['POST'])
 def predict_retard_context():
@@ -112,22 +178,66 @@ def predict_retard_context():
     if not justification: justification.append("Analyse standard.")
     return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification})
 
+# Dans app.py
+
 @app.route('/predict/sortie-anticipee-context', methods=['POST'])
 def predict_sortie_anticipee_context():
     model_name = 'sortie_anticipee_context'
-    if model_name not in models or model_name not in explainers: return jsonify({'erreur': 'Modèle sortie anticipée non disponible.'}), 503
+    if model_name not in models or model_name not in explainers: 
+        return jsonify({'erreur': 'Modèle sortie anticipée non disponible.'}), 503
+
     data = request.get_json()
     features = expected_features[model_name]
     input_df = pd.DataFrame([data], columns=features)
+    
+    # --- Prédiction (inchangée) ---
     model = models[model_name]
     prediction_proba = model.predict_proba(input_df)[0]
     decision_index = np.argmax(prediction_proba)
     decision = "TOLÉRER" if model.classes_[decision_index] == 1 else "JUSTIFICATION REQUISE"
     confiance = prediction_proba[decision_index]
+    
+    # ====================== DÉBUT DE LA MODIFICATION ======================
+    
+    # Étape 1 : Obtenir les features techniques importantes du modèle
     explainer = explainers[model_name]
-    justification_features = get_shap_based_justification(explainer, input_df, features)
-    return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification_features})
+    justification_features_techniques = get_shap_based_justification(explainer, input_df, features)
+    
+    # Étape 2 : Traduire ces features en phrases humaines
+    justification_humaine = []
+    for feature in justification_features_techniques:
+        valeur = data.get(feature, 0) # Obtenir la valeur de la feature
+        
+        if feature == 'duree_anticipation_minutes':
+            if valeur > 30:
+                justification_humaine.append(f"La durée importante de la sortie anticipée ({valeur} min) a été un facteur clé.")
+            else:
+                justification_humaine.append(f"La durée de la sortie anticipée ({valeur} min) a été analysée.")
+        
+        elif feature == 'est_fin_semaine':
+            if valeur == 1:
+                justification_humaine.append("Le fait que ce soit en fin de semaine a été pris en compte.")
+        
+        elif feature == 'nb_hs_recentes_heures':
+            if valeur > 4: # Si l'employé a fait plus de 4h sup récemment
+                justification_humaine.append("L'employé a récemment effectué des heures supplémentaires.")
+            else:
+                justification_humaine.append("L'historique des heures supplémentaires a été vérifié.")
+                
+        elif feature == 'charge_travail_jour':
+            if valeur > 0.8: # Si la charge de travail était élevée
+                justification_humaine.append("La charge de travail de la journée a été un facteur.")
+            
+    if not justification_humaine:
+        justification_humaine.append("Suggestion basée sur l'analyse générale des données.")
 
+    # ======================= FIN DE LA MODIFICATION =======================
+    
+    return jsonify({
+        "decision": decision, 
+        "confiance": f"{confiance:.0%}", 
+        "justification": justification_humaine # <-- On renvoie la liste de phrases
+    })
 @app.route('/predict/compensation', methods=['POST'])
 def predict_compensation():
     required_models = ['compensation', 'encoder_jour_type', 'encoder_decision_compensation']

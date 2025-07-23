@@ -21,4 +21,6 @@ public interface PointageRepository extends JpaRepository<Pointage, Integer> {
     // Trouve tous les pointages pour un badge dans un intervalle de temps donné.
     // Essentiel pour trouver les pointages d'un jour précis.
     //List<Pointage> findByBadgeEmployeAndDateMouvementBetween(String badgeEmploye, LocalDateTime startOfDay, LocalDateTime endOfDay);
+
+    
 }

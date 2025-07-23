@@ -22,6 +22,7 @@ import org.springframework.web.client.RestClient;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -45,6 +46,8 @@ public class AnomalieDetectionService {
     @Transactional
     // Dans AnomalieDetectionService.java
 
+
+// Dans AnomalieDetectionService.java
 
 public void lancerDetectionPourTous(LocalDate jour) {
     logger.info("Lancement de la détection des anomalies pour le jour : {}", jour);
@@ -371,26 +374,61 @@ private void detecterOmissionAvecIA(Employe employe, LocalDate jour, Optional<Em
         }
     }
 
-    private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire, Optional<Employe> managerOpt) {
-        if (pointages.size() < 2) return;
-        long dureeTravailleeMinutes = Duration.between(pointages.get(0).getDateMouvement(), pointages.get(pointages.size() - 1).getDateMouvement()).toMinutes();
-        long dureeTheoriqueMinutes = 0;
-        if (horaire != null && horaire.getHeureDebutTheorique() != null && horaire.getHeureFinTheorique() != null) {
-            dureeTheoriqueMinutes = Duration.between(horaire.getHeureDebutTheorique(), horaire.getHeureFinTheorique()).toMinutes() - Optional.ofNullable(horaire.getDureeTotalePauseMinutes()).orElse(0);
-        }
-        if (dureeTravailleeMinutes > dureeTheoriqueMinutes) {
-            long hsMinutes = dureeTravailleeMinutes - dureeTheoriqueMinutes;
-            if (hsMinutes < 120) {
-                logger.info("Heure supplémentaire de {} minutes pour le badge {} ignorée (inférieure au seuil de 120 min).", hsMinutes, employe.getBadge());
-                return;
-            }
-            long hsPasseesValidees = anomalieRepository.countByEmployeAndTypeAnomalieAndStatut(employe, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, StatutAnomalie.VALIDEE);
-            Map<String, Object> requestBody = Map.of("badge", employe.getBadge(), "hs_minutes", hsMinutes, "taux_absence_service", 0.1, "nb_hs_validees_historique", hsPasseesValidees);
-            String suggestionTexte = callIaService("/predict/overtime-context", requestBody, "prédiction d'heures sup");
-            String message = String.format("Heure supplémentaire de %d minutes détectée.", hsMinutes);
-            creerEtSauverAnomalie(employe, jour, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, message, suggestionTexte, null, hsMinutes, managerOpt);
-        }
+    // Dans AnomalieDetectionService.java
+
+private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire, Optional<Employe> managerOpt) {
+    if (pointages.size() < 2) return;
+    
+    long dureeTravailleeMinutes = Duration.between(pointages.get(0).getDateMouvement(), pointages.get(pointages.size() - 1).getDateMouvement()).toMinutes();
+    long dureeTheoriqueMinutes = 0;
+    
+    if (horaire != null && horaire.getHeureDebutTheorique() != null && horaire.getHeureFinTheorique() != null) {
+        dureeTheoriqueMinutes = Duration.between(horaire.getHeureDebutTheorique(), horaire.getHeureFinTheorique()).toMinutes() - Optional.ofNullable(horaire.getDureeTotalePauseMinutes()).orElse(0);
     }
+    
+    if (dureeTravailleeMinutes > dureeTheoriqueMinutes) {
+        long hsMinutes = dureeTravailleeMinutes - dureeTheoriqueMinutes;
+        
+        if (hsMinutes < 120) {
+            logger.info("Heure supplémentaire de {} minutes pour le badge {} ignorée (inférieure au seuil de 120 min).", hsMinutes, employe.getBadge());
+            return;
+        }
+
+        // ====================== DÉBUT DE LA MODIFICATION ======================
+
+        // Étape 1 : Récupérer le mode de compensation préféré de l'employé depuis son planning.
+        String modeCompensationPrefere = "PAYE"; // Valeur par défaut si rien n'est défini.
+        
+        // On vérifie que l'employé a un planning et que ce planning a une catégorie HS définie.
+        if (employe.getPlanning() != null && employe.getPlanning().getCategorieHeureSup() != null) {
+            
+            // Hypothèse basée sur tes données : 1 = COMPENSE, 0 (ou autre) = PAYE.
+            if (employe.getPlanning().getCategorieHeureSup() == 1) {
+                modeCompensationPrefere = "COMPENSE";
+            }
+        }
+
+        // Étape 2 : Créer le corps de la requête pour l'IA en y ajoutant notre nouvelle information.
+        // On ne peut plus utiliser Map.of() car il est immuable. On passe à HashMap.
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("badge", employe.getBadge());
+        requestBody.put("hs_minutes", hsMinutes);
+        requestBody.put("taux_absence_service", 0.1); // On garde les anciennes features pour la compatibilité
+        
+        long hsPasseesValidees = anomalieRepository.countByEmployeAndTypeAnomalieAndStatut(employe, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, StatutAnomalie.VALIDEE);
+        requestBody.put("nb_hs_validees_historique", hsPasseesValidees);
+        
+        // On ajoute la nouvelle feature !
+        requestBody.put("mode_compensation_prefere", modeCompensationPrefere);
+        
+        // ======================= FIN DE LA MODIFICATION =======================
+
+        String suggestionTexte = callIaService("/predict/overtime-context", requestBody, "prédiction d'heures sup");
+        String message = String.format("Heure supplémentaire de %d minutes détectée.", hsMinutes);
+        
+        creerEtSauverAnomalie(employe, jour, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, message, suggestionTexte, null, hsMinutes, managerOpt);
+    }
+}
 
     private void detecterPauseTropLongue(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire, Optional<Employe> managerOpt) {
         if (pointages.size() < 4) return;
