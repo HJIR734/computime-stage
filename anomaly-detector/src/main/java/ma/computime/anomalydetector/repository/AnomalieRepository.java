@@ -1,4 +1,4 @@
-// FICHIER : AnomalieRepository.java (Code Complet et Final)
+// Emplacement : src/main/java/ma/computime/anomalydetector/repository/AnomalieRepository.java
 package ma.computime.anomalydetector.repository;
 
 import ma.computime.anomalydetector.entity.Anomalie;
@@ -11,18 +11,30 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
-import ma.computime.anomalydetector.entity.StatutAnomalie;
 
 public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
 
-    List<Anomalie> findByStatut(StatutAnomalie statut);
+    // === REQUÊTES OPTIMISÉES POUR LE DASHBOARD MANAGER ===
+    @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.managerResponsable.id = :managerId AND a.statut = :statut")
+    List<Anomalie> findByManagerIdAndStatutWithEmploye(Integer managerId, StatutAnomalie statut);
+    
+    @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.managerResponsable.id = :managerId AND a.statut <> :statut")
+    List<Anomalie> findByManagerIdAndStatutNotWithEmploye(Integer managerId, StatutAnomalie statut);
 
-    // --- NOUVELLE MÉTHODE AJOUTÉE : Filtrer par manager et statut ---
-    List<Anomalie> findByNoeudConcerneIdAndStatut(Integer noeudId, StatutAnomalie statut);
+    // === REQUÊTES OPTIMISÉES POUR LE DASHBOARD NOEUD ===
+    @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.noeudConcerne.id = :noeudId AND a.statut = :statut")
+    List<Anomalie> findByNoeudIdAndStatutWithEmploye(Integer noeudId, StatutAnomalie statut);
 
+    @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.noeudConcerne.id = :noeudId AND a.statut <> :statut")
+    List<Anomalie> findByNoeudIdAndStatutNotWithEmploye(Integer noeudId, StatutAnomalie statut);
+
+    // === AUTRES MÉTHODES UTILES CONSERVÉES ===
+    long countByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
+    
     boolean existsByEmployeAndJourAnomalieAndTypeAnomalie(Employe employe, LocalDate jourAnomalie, TypeAnomalie typeAnomalie);
-    List<Anomalie> findByNoeudConcerneIdAndStatutNot(Integer noeudId, StatutAnomalie statut);
-     long countByEmployeAndTypeAnomalieAndStatut(Employe employe, TypeAnomalie type, StatutAnomalie statut);
+
+    long countByEmployeAndTypeAnomalieAndStatut(Employe employe, TypeAnomalie type, StatutAnomalie statut);
+
     @Query("SELECT COUNT(a) FROM Anomalie a WHERE a.employe = :employe AND a.typeAnomalie = :type AND a.statut = :statut AND YEAR(a.jourAnomalie) = :year")
     long countByEmployeAndTypeAnomalieAndStatutInYear(
         @Param("employe") Employe employe, 
@@ -30,16 +42,4 @@ public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
         @Param("statut") StatutAnomalie statut, 
         @Param("year") int year
     );
-
-    List<Anomalie> findByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
-
-    // Compte les anomalies EN_ATTENTE pour un manager spécifique.
-    long countByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
-
-    // Trouve toutes les anomalies pour une période donnée, triées par date.
-    List<Anomalie> findByJourAnomalieBetweenOrderByJourAnomalieDesc(LocalDate dateDebut, LocalDate dateFin);
-
-    List<Anomalie> findByManagerResponsableIdAndStatutNot(Integer managerId, StatutAnomalie statut);
-
-    
 }

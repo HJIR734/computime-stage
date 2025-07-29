@@ -15,4 +15,6 @@ public interface EmployeRepository extends JpaRepository<Employe, Integer> {
     Optional<Employe> findByMatricule(String matricule);
     List<Employe> findByNoeud(Noeud noeud);
 
+    
+
 }

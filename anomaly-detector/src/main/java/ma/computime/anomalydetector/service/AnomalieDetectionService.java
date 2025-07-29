@@ -50,22 +50,19 @@ public class AnomalieDetectionService {
     @Autowired private CongeRepository congeRepository;
     
 
-    @Transactional
-    // Dans AnomalieDetectionService.java
-
 
 // Dans AnomalieDetectionService.java
 
+// Emplacement: AnomalieDetectionService.java
+// REMPLACE CETTE MÉTHODE ENTIÈREMENT (Version Finale)
+
+@Transactional
 public void lancerDetectionPourTous(LocalDate jour) {
     logger.info("Lancement de la détection des anomalies pour le jour : {}", jour);
     
     List<Employe> employes = employeRepository.findAll();
 
     for (Employe employe : employes) {
-        
-        // =========================================================================
-        // ÉTAPE 0 : TROUVER LE MANAGER DE L'EMPLOYÉ (AJOUTÉ)
-        // =========================================================================
         Optional<Employe> managerOpt = trouverManagerPourEmploye(employe);
 
         List<Pointage> pointagesDuJour = pointageRepository.findForBadgeOnDay(
@@ -75,59 +72,83 @@ public void lancerDetectionPourTous(LocalDate jour) {
          .sorted(Comparator.comparing(Pointage::getDateMouvement))
          .collect(Collectors.toList());
 
-        // 1. Déterminer le planning actif (normal ou exceptionnel)
-        Planning planningActif = employe.getPlanning(); 
-        Optional<PlanningException> exceptionOpt = planningExceptionRepository.findActiveExceptionForEmploye(employe, jour);
+        // Si aucun pointage, on ne peut pas détecter d'omission. On passera à la détection d'absence plus tard.
+        if (pointagesDuJour.isEmpty()) {
+             // La logique d'absence sera gérée plus bas
+        } else {
+             // =========================================================================
+             // === NOUVELLE LOGIQUE DE DÉTECTION D'OMISSION (PLUS INTELLIGENTE) ===
+             // =========================================================================
+            if (pointagesDuJour.size() % 2 != 0) {
+                // On a un nombre impair de pointages. Est-ce une VRAIE omission ?
+                
+                // Condition 1 : Est-ce que l'employé devait travailler ?
+                Planning planningActif = employe.getPlanning(); // On récupère le planning pour vérifier
+                Optional<PlanningException> exceptionOpt = planningExceptionRepository.findActiveExceptionForEmploye(employe, jour);
+                if (exceptionOpt.isPresent() && exceptionOpt.get().getPlanning() != null) {
+                    planningActif = exceptionOpt.get().getPlanning();
+                }
+                boolean devaitTravailler = (planningActif != null && planningActif.getHorairePourJour(jour.getDayOfWeek()).isPresent()) || jourFerieRepository.existsByDate(jour);
 
-        if (exceptionOpt.isPresent()) {
-            PlanningException exception = exceptionOpt.get();
-            if (exception.getPlanning() != null) {
-                planningActif = exception.getPlanning();
-                logger.info("-> Exception (ID: {}) trouvée pour l'employé {}. Utilisation du planning exceptionnel ID: {}.",
-                        exception.getId(), employe.getBadge(), planningActif.getId());
-            } else {
-                logger.warn("-> Exception (ID: {}) trouvée pour l'employé {} mais elle n'a pas de planning associé. Utilisation du planning normal.",
-                        exception.getId(), employe.getBadge());
+                // Condition 2 : Ou bien, a-t-il travaillé un temps significatif ? (plus de 15 minutes)
+                // Cette condition est vraie seulement si on a au moins 2 pointages, ce qui n'est pas le cas ici (impair).
+                // Donc on se base uniquement sur le fait qu'il devait travailler.
+
+                if (devaitTravailler) {
+                    // OUI, il devait travailler ET il a un nombre impair de pointages. C'est une OMISSION.
+                    detecterOmissionAvecIA(employe, jour, managerOpt);
+                    continue; // On a traité ce cas, on passe à l'employé suivant.
+                } else {
+                    // NON, il ne devait pas travailler. 
+                    // Un pointage unique un jour de repos n'est pas une omission. On l'ignore.
+                    logger.info("Pointage impair détecté pour l'employé {} le {}, mais ce n'était pas un jour de travail planifié. Anomalie d'omission ignorée.", employe.getBadge(), jour);
+                    // On ne met pas de 'continue' ici, car il faut quand même vérifier s'il a travaillé un jour de repos plus bas.
+                }
             }
         }
 
-        // 2. Vérifier si c'est un jour non travaillé (Férié ou Repos selon le planning actif)
-        // NOTE: On passe 'managerOpt' aux méthodes de détection pour qu'elles puissent l'assigner.
+        // =========================================================================
+        // === LE RESTE DE LA LOGIQUE RESTE INCHANGÉ ===
+        // =========================================================================
+        
+        // On redéfinit planningActif ici pour être sûr.
+        Planning planningActif = employe.getPlanning(); 
+        Optional<PlanningException> exceptionOpt = planningExceptionRepository.findActiveExceptionForEmploye(employe, jour);
+        if (exceptionOpt.isPresent() && exceptionOpt.get().getPlanning() != null) {
+            planningActif = exceptionOpt.get().getPlanning();
+        }
+
         boolean estUnJourOff = detecterTravailJourNonTravaille(employe, jour, pointagesDuJour, planningActif, managerOpt);
         if (estUnJourOff) {
-            detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, null, managerOpt);
+            // S'il a un nombre pair de pointages un jour OFF, on vérifie les HS et c'est tout.
+            if (pointagesDuJour.size() % 2 == 0) {
+                 detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, null, managerOpt);
+            }
             continue;
         }
 
-        // 3. Gérer l'absence si aucun pointage une journée où il fallait travailler
         if (pointagesDuJour.isEmpty()) {
             detecterAbsenceInjustifiee(employe, jour, planningActif, managerOpt);
             continue;
         }
-        
-        // 4. Si on arrive ici, l'employé a pointé et devait travailler. On a besoin d'un planning pour continuer.
+
         if (planningActif == null) {
-            logger.warn("L'employé avec badge {} n'a pas de planning affecté (ni d'exception valide). Anomalies basées sur les horaires non détectées.", employe.getBadge());
+            logger.warn("Employé {} : pas de planning pour détecter les anomalies basées sur les horaires.", employe.getBadge());
             continue;
         }
 
-        // 5. Récupérer l'horaire du jour depuis le planning actif
         Optional<Horaire> horaireDuJourOpt = planningActif.getHorairePourJour(jour.getDayOfWeek());
-
         if (horaireDuJourOpt.isPresent()) {
-            Horaire horaireDuJour = horaireDuJourOpt.get();
-            
-            // 6. Lancer les détections basées sur les horaires
-            if (pointagesDuJour.size() % 2 != 0) {
-                detecterOmissionAvecIA(employe, jour, managerOpt);
-            } else {
+            // On ne vérifie que les cas PAIRS ici, car les cas IMPAIRS ont déjà été traités (ou ignorés).
+            if (pointagesDuJour.size() % 2 == 0) {
+                Horaire horaireDuJour = horaireDuJourOpt.get();
                 detecterRetard(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
                 detecterSortieAnticipeeAvecIA(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
                 detecterHeureSupplementaireAvecIA(employe, jour, pointagesDuJour, horaireDuJour, managerOpt);
             }
         } else {
-             logger.warn("Aucun horaire défini pour {} dans le planning actif ID {} pour l'employé {}.",
-                    jour.getDayOfWeek(), planningActif.getId(), employe.getBadge());
+             logger.warn("Employé {} : pas d'horaire défini pour {} dans le planning {}.",
+                    employe.getBadge(), jour.getDayOfWeek(), planningActif.getId());
         }
     }
     logger.info("Détection des anomalies terminée pour le jour : {}", jour);
@@ -311,27 +332,39 @@ private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour, Plannin
         // On continue le processus de création d'anomalie.
         
         // ... (le reste du code avec l'appel à l'IA ne change pas)
+        // DANS la méthode detecterAbsenceInjustifiee de AnomalieDetectionService.java
+        // REMPLACE ton ancien bloc Map<String, Object>... par celui-ci
+
         Map<String, Object> context = new HashMap<>();
+
+        // Features existantes
         context.put("duree_absence_jours", 1);
         double soldeConges = employe.getSoldeConges() != null ? employe.getSoldeConges() : 0.0;
         context.put("solde_conges_jours", soldeConges);
         long nbAbsencesAnnee = anomalieRepository.countByEmployeAndTypeAnomalieAndStatutInYear(
-            employe, 
-            TypeAnomalie.ABSENCE_INJUSTIFIEE, 
-            StatutAnomalie.VALIDEE,
-            jour.getYear()
+          employe, 
+          TypeAnomalie.ABSENCE_INJUSTIFIEE, 
+          StatutAnomalie.VALIDEE,
+          jour.getYear()
         );
         context.put("nb_absences_injustifiees_annee", nbAbsencesAnnee);
         boolean estAdjacentWeekend = jour.getDayOfWeek() == DayOfWeek.MONDAY || jour.getDayOfWeek() == DayOfWeek.FRIDAY;
         boolean estAdjacentFerie = jourFerieRepository.existsByDate(jour.minusDays(1)) || jourFerieRepository.existsByDate(jour.plusDays(1));
         context.put("est_adjacent_weekend_ferie", (estAdjacentWeekend || estAdjacentFerie) ? 1 : 0);
-        context.put("charge_equipe", 0.7);
+        context.put("charge_equipe", 0.7); // On garde une valeur fixe pour l'instant
+
+        // ==============================================================================
+        // NOUVELLE FEATURE AJOUTÉE
+        // ==============================================================================
+        long nbAbsences90Jours = absenceRepository.countRecentValidatedAbsences(employe, jour.minusDays(90).atStartOfDay(), jour.atStartOfDay());
+        context.put("nb_absences_90_derniers_jours", nbAbsences90Jours);
+        // ==============================================================================
 
         String suggestionTexte = callIaService("/predict/absence-injustifiee", context, "prédiction d'absence");
-        
         String message = "Aucun pointage détecté pour une journée de travail planifiée.";
-        
         creerEtSauverAnomalie(employe, jour, TypeAnomalie.ABSENCE_INJUSTIFIEE, message, suggestionTexte, null, null, managerOpt);
+        
+
     }
 }
 

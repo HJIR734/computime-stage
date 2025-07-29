@@ -2,51 +2,44 @@
 package ma.computime.anomalydetector.dto;
 
 import ma.computime.anomalydetector.entity.Anomalie;
-import ma.computime.anomalydetector.entity.Employe;
+import java.time.format.DateTimeFormatter;
 
 public class AnomalieMapper {
 
-    // Convertit une entité Employe en EmployeDto
-    public static EmployeDto toEmployeDto(Employe employe) {
-        if (employe == null) {
-            return null;
-        }
-        EmployeDto dto = new EmployeDto();
-        dto.setId(employe.getId());
-        dto.setMatricule(employe.getMatricule());
-        dto.setBadge(employe.getBadge());
-        dto.setPrenom(employe.getPrenom());
-        dto.setNom(employe.getNom());
-        return dto;
-    }
+    // On définit nos formats de date ici, une seule fois.
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    // Convertit une entité Anomalie en AnomalieDto (Version MISE À JOUR)
+    // Convertit une entité Anomalie en notre DTO simple pour l'affichage
     public static AnomalieDto toAnomalieDto(Anomalie anomalie) {
         if (anomalie == null) {
             return null;
         }
+        
         AnomalieDto dto = new AnomalieDto();
         
-        // Champs de base
+        // --- Remplissage des champs de l'anomalie ---
         dto.setId(anomalie.getId());
-        dto.setJourAnomalie(anomalie.getJourAnomalie());
-        dto.setTypeAnomalie(anomalie.getTypeAnomalie());
         dto.setMessage(anomalie.getMessage());
-        dto.setStatut(anomalie.getStatut());
-        dto.setDateCreation(anomalie.getDateCreation());
-        dto.setCommentaireValidation(anomalie.getCommentaireValidation());
+        dto.setSuggestion(anomalie.getSuggestion()); // Le champ de suggestion simple
+        dto.setValeurSuggestion(anomalie.getValeurSuggestion()); // L'heure suggérée
         dto.setDureeEnMinutes(anomalie.getDureeEnMinutes());
-        
-        // Mapper l'employé associé
-        dto.setEmploye(toEmployeDto(anomalie.getEmploye()));
-        
-        // ====================================================================
-        // === MAPPING DES NOUVEAUX CHAMPS DE L'IA ===
-        // ====================================================================
-        dto.setDecisionIa(anomalie.getDecisionIa());
-        dto.setJustificationIa(anomalie.getJustificationIa());
-        dto.setValeurSuggestion(anomalie.getValeurSuggestion());
-        dto.setSuggestion(anomalie.getSuggestion());
+        dto.setCommentaireValidation(anomalie.getCommentaireValidation());
+
+        // --- Remplissage des champs formatés ---
+        dto.setJourAnomalie(anomalie.getJourAnomalie().format(DATE_FORMATTER));
+        dto.setTypeAnomalie(anomalie.getTypeAnomalie().toString());
+        dto.setStatut(anomalie.getStatut().toString());
+
+        // --- Remplissage des champs de l'employé (la partie importante) ---
+        if (anomalie.getEmploye() != null) {
+            // On construit le nom complet ici
+            dto.setNomEmploye(anomalie.getEmploye().getPrenom() + " " + anomalie.getEmploye().getNom());
+            dto.setBadgeEmploye(anomalie.getEmploye().getBadge());
+        } else {
+            // Sécurité si jamais un employé n'est pas lié
+            dto.setNomEmploye("Employé non défini");
+            dto.setBadgeEmploye("N/A");
+        }
         
         return dto;
     }

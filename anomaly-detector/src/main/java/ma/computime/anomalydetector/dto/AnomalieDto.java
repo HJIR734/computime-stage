@@ -2,50 +2,27 @@
 package ma.computime.anomalydetector.dto;
 
 import lombok.Data;
-import ma.computime.anomalydetector.entity.StatutAnomalie;
-import ma.computime.anomalydetector.entity.TypeAnomalie;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime; // N'oublie pas cet import
+import java.time.LocalTime;
 
 @Data
 public class AnomalieDto {
     private Long id;
-    private LocalDate jourAnomalie;
-    private TypeAnomalie typeAnomalie;
+    
+    // --- Informations sur l'employé (APLATIES) ---
+    private String nomEmploye; // Format "Prénom Nom"
+    private String badgeEmploye;
+
+    // --- Informations sur l'anomalie ---
+    private String jourAnomalie; // On va le passer en String formaté (ex: "28/07/2025")
+    private String typeAnomalie;
     private String message;
-    private StatutAnomalie statut;
-    private LocalDateTime dateCreation;
+    private String statut;
     private String commentaireValidation;
-    
-    // Au lieu d'un objet Employe complet, on utilise notre DTO simple.
-    private EmployeDto employe;
-    
-    // Champ pour la durée, utile à afficher
     private Long dureeEnMinutes;
     
-    // ====================================================================
-    // === CHAMPS DE L'IA - AJOUTÉS POUR LE FRONTEND ===
-    // ====================================================================
-    
-    /**
-     * La décision principale de l'IA (ex: "ACCEPTER").
-     */
-    private String decisionIa;
-
-    /**
-     * La justification textuelle complète de l'IA.
-     */
-    private String justificationIa;
-
-    /**
-     * La valeur concrète suggérée par l'IA (ex: l'heure '08:30').
-     */
-    private LocalTime valeurSuggestion;
-
-    // L'ancien champ 'suggestion' (String) est maintenant redondant
-    // car 'justificationIa' est plus complet. On peut le commenter ou le supprimer.
-    // private String suggestion; 
-    private String suggestion;
+    // --- Informations de l'IA ---
+    private String suggestion; // On garde un champ simple pour l'affichage
+    private LocalTime valeurSuggestion; // Utile pour pré-remplir les champs de temps
 }

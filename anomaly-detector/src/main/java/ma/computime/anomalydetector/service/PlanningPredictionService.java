@@ -60,8 +60,8 @@ public class PlanningPredictionService {
     
     private String determinerNiveauRisque(double probabilite) {
         if (probabilite < 0) return "Erreur"; // Cas où l'API IA n'a pas répondu
-        if (probabilite >= 15.0) return "Élevé";
-        if (probabilite >= 5.0) return "Moyen";
+        if (probabilite >= 5.0) return "Élevé";
+        if (probabilite >= 1.5) return "Moyen";
         return "Faible";
     }
 }
