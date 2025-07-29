@@ -40,49 +40,32 @@ public class Planning {
     @JsonManagedReference("planning-jour")
     private List<Jour> jours;
 
-    // ===================================================================
-    // DÉBUT DE LA PARTIE MODIFIÉE
-    // ===================================================================
-
-    /**
-     * Trouve l'horaire correspondant à un jour de la semaine (Lundi, Mardi, etc.).
-     * Cette méthode va chercher dans la liste des jours celui dont le libellé
-     * correspond au jour demandé.
-     *
-     * @param dayOfWeek Le jour de la semaine (ex: DayOfWeek.MONDAY).
-     * @return Un Optional contenant l'Horaire s'il est trouvé, sinon un Optional vide.
-     */
+    
     public Optional<Horaire> getHorairePourJour(DayOfWeek dayOfWeek) {
         if (jours == null || jours.isEmpty()) {
             return Optional.empty();
         }
 
-        // On cherche le nom du jour en français (ex: "lundi")
+        
         String nomJourRecherche = getFrenchDayName(dayOfWeek);
 
-        // On parcourt la liste des jours du planning...
+        
         return jours.stream()
-                // ...et on filtre pour trouver celui qui a le bon libellé.
+                
                 .filter(jour -> jour.getLibelle() != null &&
                                 normalizeString(jour.getLibelle()).equalsIgnoreCase(nomJourRecherche))
                 .findFirst()
-                .map(Jour::getHoraire); // Si on trouve le jour, on retourne son horaire.
+                .map(Jour::getHoraire); 
     }
 
-    /**
-     * Méthode privée pour convertir une chaîne en minuscule et sans accents
-     * pour une comparaison fiable.
-     */
+    
     private String normalizeString(String input) {
-        // Cette ligne transforme "Mardi" en "mardi" ou "Mécredi" en "mercredi".
         return java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
                 .toLowerCase();
     }
 
-    /**
-     * Méthode privée pour obtenir le nom français du jour de la semaine.
-     */
+    
     private String getFrenchDayName(DayOfWeek dayOfWeek) {
         switch (dayOfWeek) {
             case MONDAY: return "lundi";
@@ -95,7 +78,5 @@ public class Planning {
             default: return "";
         }
     }
-    // ===================================================================
-    // FIN DE LA PARTIE MODIFIÉE
-    // ===================================================================
+    
 }

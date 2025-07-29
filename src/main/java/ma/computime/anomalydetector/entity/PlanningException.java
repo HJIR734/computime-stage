@@ -35,15 +35,14 @@ public class PlanningException {
     @JoinColumn(name = "PLANNING_FK")
     private Planning planning;
 
-    // C'est la relation "Plusieurs-à-Plusieurs" avec les employés.
-    // Elle est définie via la table de liaison "user_exception".
+    
     @ManyToMany
     @JoinTable(
-        name = "user_exception", // Le vrai nom de la table de liaison
-        joinColumns = @JoinColumn(name = "EXCEPTION_ID"), // La colonne de cette entité (Exception)
-        inverseJoinColumns = @JoinColumn(name = "USER_ID") // La colonne de l'autre entité (Employe)
+        name = "user_exception", 
+        joinColumns = @JoinColumn(name = "EXCEPTION_ID"), 
+        inverseJoinColumns = @JoinColumn(name = "USER_ID") 
     )
-    @ToString.Exclude // Pour éviter les boucles infinies dans les logs
-    @EqualsAndHashCode.Exclude // Pour éviter les boucles infinies dans les comparaisons
+    @ToString.Exclude 
+    @EqualsAndHashCode.Exclude 
     private Set<Employe> employes;
 }

@@ -39,7 +39,7 @@ public class Anomalie {
     @Column(name = "statut")
     private StatutAnomalie statut;
 
-    // --- Colonne de suggestion originale, on peut la garder ou la commenter si non utilisée ---
+    
     @Column(name = "suggestion_correction")
     private String suggestion;
 
@@ -47,40 +47,26 @@ public class Anomalie {
     @JoinColumn(name = "manager_responsable_id", nullable = true)
     private Employe managerResponsable;
 
-    // Pour savoir quand le manager a traité l'anomalie.
     @Column(name = "date_traitement")
     private LocalDateTime dateTraitement;
 
-    // Pour que le manager puisse laisser un commentaire.
+    
     @Column(name = "commentaire_manager", length = 500)
     private String commentaireManager;
 
-    // ====================================================================
-    // === CHAMPS DÉDIÉS AUX SUGGESTIONS DE L'IA - VERSION COMPLÈTE ===
-    // ====================================================================
     
-    /**
-     * Stocke la décision principale de l'IA (ex: "ACCEPTER", "REJETER").
-     * C'est le nouveau champ qui causait l'erreur.
-     */
     @Column(name = "decision_ia", length = 50)
     private String decisionIa;
 
-    /**
-     * Stocke la justification textuelle complète fournie par l'IA.
-     * C'est le deuxième nouveau champ.
-     */
+    
     @Column(name = "justification_ia", length = 1000)
     private String justificationIa;
 
-    /**
-     * Stocke la valeur concrète suggérée par l'IA (ex: heure de pointage manquant).
-     * Ce champ existait déjà, il est conservé.
-     */
+    
     @Column(name = "valeur_suggestion")
     private LocalTime valeurSuggestion;
 
-    // ====================================================================
+
 
     @Column(name = "duree_minutes")
     private Long dureeEnMinutes;

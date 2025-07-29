@@ -4,7 +4,7 @@ package ma.computime.anomalydetector.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.Duration; // <-- NOUVEL IMPORT
+import java.time.Duration; 
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
@@ -33,7 +33,7 @@ public class Horaire {
     @OneToMany(mappedBy = "horaire", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private List<PlageHoraire> plagesHoraires;
 
-    // --- MÉTHODES UTILES EXISTANTES (inchangées) ---
+    
 
     @JsonIgnore
     public LocalTime getHeureDebutTheorique() {
@@ -57,21 +57,17 @@ public class Horaire {
                 .orElse(null);
     }
     
-    // ==============================================================================
-    // =================== NOUVELLE MÉTHODE POUR LA DURÉE DE PAUSE ====================
-    // ==============================================================================
+    
     @JsonIgnore
     public Integer getDureeTotalePauseMinutes() {
         if (plagesHoraires == null || plagesHoraires.size() < 2) {
-            // Pas de pause s'il n'y a pas au moins 2 plages horaires
             return 0;
         }
 
-        // Trier les plages par heure de début pour être sûr
+        
         plagesHoraires.sort(Comparator.comparing(PlageHoraire::getHeureDebut));
 
         long dureeTotalePauseEnMinutes = 0;
-        // On calcule la durée des "trous" entre les plages horaires
         for (int i = 0; i < plagesHoraires.size() - 1; i++) {
             LocalTime finPlageActuelle = plagesHoraires.get(i).getHeureFin();
             LocalTime debutPlageSuivante = plagesHoraires.get(i + 1).getHeureDebut();
@@ -83,5 +79,5 @@ public class Horaire {
         
         return (int) dureeTotalePauseEnMinutes;
     }
-    // ==============================================================================
+    
 }

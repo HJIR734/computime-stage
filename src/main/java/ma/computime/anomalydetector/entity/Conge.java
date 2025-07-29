@@ -26,10 +26,10 @@ public class Conge {
     private LocalDateTime dateReprise;
 
     @Column(name = "STATUT")
-    private String statut; // "workflow_status_validated", "workflow_status_encours", etc.
+    private String statut; 
 
     @Column(name = "NBR_JOUR")
     private Double nombreDeJours;
     
-    // On pourrait ajouter TYPE_CONGE_FK plus tard pour savoir si c'est un congé payé, maladie, etc.
+    
 }

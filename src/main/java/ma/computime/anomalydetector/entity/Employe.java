@@ -11,7 +11,7 @@ import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set; // <--- AJOUTE CETTE LIGNE
+import java.util.Set; 
 
 @Entity
 @Table(name = "utilisateur")
@@ -52,7 +52,7 @@ public class Employe {
     @JsonManagedReference("employe-pointage")
     private List<Pointage> pointages;
 
-    @ManyToMany(mappedBy = "employes") // "mappedBy" indique que c'est l'autre côté qui gère la relation
+    @ManyToMany(mappedBy = "employes") 
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Set<PlanningException> exceptions;
@@ -61,7 +61,7 @@ public class Employe {
     private Double soldeConges;
 
     @ManyToOne
-    @JoinColumn(name = "PROFIL_METIER_FK") // C'est la colonne de la table 'utilisateur' qui fait le lien
+    @JoinColumn(name = "PROFIL_METIER_FK") 
     private ProfilMetier profilMetier;
 
     

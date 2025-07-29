@@ -19,20 +19,18 @@ public class Recuperation {
     @JoinColumn(name = "USER_FK")
     private Employe employe;
 
-    // La date où le travail de récupération a été effectué.
+    
     @Column(name = "DATE_REC")
     private LocalDateTime dateRecuperation;
 
     @Column(name = "STATUT")
     private String statut; // Ex: "VALIDEE", "EN_ATTENTE", "REJETEE"
 
-    // La durée en minutes ou heures du temps de travail contractuel récupéré.
+    
     @Column(name = "TM_CONTRACT")
     private Double tempsContractuel;
 
-    // ID de l'absence qui est compensée par cette récupération.
-    // On le mappe simplement comme un Integer pour l'instant.
-    // On pourrait créer une entité Absence plus tard si besoin.
+
     @Column(name = "ABSENCE_FK")
     private Integer absenceId;
 

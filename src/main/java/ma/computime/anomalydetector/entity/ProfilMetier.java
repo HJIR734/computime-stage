@@ -8,14 +8,14 @@ import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
-@Table(name = "profil_metier") // Assure-toi que le nom de la table est correct
+@Table(name = "profil_metier") 
 @Data
 public class ProfilMetier {
 
     @Id
-    @Column(name = "ID") // Assure-toi que le nom de la colonne ID est correct
+    @Column(name = "ID") 
     private Integer id;
 
-    @Column(name = "LIBELLE") // Assure-toi que le nom de la colonne du libellé est correct
+    @Column(name = "LIBELLE") 
     private String libelle;
 }

@@ -17,10 +17,10 @@ public class Pointage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    // C'est cette annotation qui a été modifiée
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "BADGE", referencedColumnName = "BADGE", insertable = false, updatable = false)
-    @JsonBackReference("employe-pointage") // On a juste ajouté le nom "employe-pointage" ici
+    @JsonBackReference("employe-pointage") 
     private Employe employe;
     
     @Column(name = "BADGE")

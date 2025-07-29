@@ -1,6 +1,3 @@
-// FICHIER : Jour.java
-// CE FICHIER EST DÉJÀ CORRECT, AUCUN CHANGEMENT NÉCESSAIRE.
-
 package ma.computime.anomalydetector.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -17,7 +14,7 @@ public class Jour {
     private Integer id;
 
     @Column(name = "LIBELLE")
-    private String libelle; // Parfait, on va utiliser ce champ.
+    private String libelle; 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "PLANNING_HEBDO_FK")

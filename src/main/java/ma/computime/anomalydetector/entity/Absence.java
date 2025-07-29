@@ -26,10 +26,10 @@ public class Absence {
     private LocalDateTime dateReprise;
 
     @Column(name = "STATUT")
-    private String statut; // Ex: "VALIDEE", "EN_ATTENTE"
+    private String statut; 
 
     @Column(name = "DUREE")
-    private Double duree; // Durée de l'absence (probablement en heures ou jours)
+    private Double duree; 
     
-    // On pourrait ajouter les autres champs comme TYPE_ABSENCE_FK plus tard si besoin
+    
 }

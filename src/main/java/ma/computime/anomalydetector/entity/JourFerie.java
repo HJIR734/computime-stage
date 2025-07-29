@@ -7,19 +7,19 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "jr_ferie") // Nom de la table correct
+@Table(name = "jr_ferie") 
 @Data
 public class JourFerie {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // Puisque la colonne est auto-incrémentée (AI)
+    @GeneratedValue(strategy = GenerationType.IDENTITY) 
     @Column(name = "ID")
     private Integer id;
 
     @Column(name = "LIBELLE")
     private String libelle;
 
-    // La colonne est de type DATETIME, donc on utilise LocalDateTime en Java
+    
     @Column(name = "DATE_DEBUT")
     private LocalDateTime dateDebut;
 }

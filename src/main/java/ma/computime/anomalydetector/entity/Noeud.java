@@ -19,7 +19,7 @@ public class Noeud {
     @Column(name = "LIBELLE")
     private String libelle;
 
-    // Un noeud peut avoir un noeud parent (la hiérarchie)
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "NOEUD_FK")
     private Noeud noeudParent;
