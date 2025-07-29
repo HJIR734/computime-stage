@@ -36,10 +36,9 @@ public class DashboardController {
     @Autowired private AnomalieDetectionService anomalieService;
     @Autowired private NoeudRepository noeudRepository;
 
-    // --- Tes méthodes existantes (on ne les touche pas) ---
+    
     @GetMapping("/noeud/{noeudId}")
     public String getDashboardPourNoeud(@PathVariable Integer noeudId, Model model) {
-        // ... Ton code existant pour cette méthode
         var anomaliesEnAttente = anomalieRepository.findByNoeudIdAndStatutWithEmploye(noeudId, StatutAnomalie.EN_ATTENTE).stream().map(AnomalieMapper::toAnomalieDto).collect(Collectors.toList());
         var historiqueRecent = anomalieRepository.findByNoeudIdAndStatutNotWithEmploye(noeudId, StatutAnomalie.EN_ATTENTE).stream().map(AnomalieMapper::toAnomalieDto).collect(Collectors.toList());
         model.addAttribute("titre", "Anomalies du Service (Noeud " + noeudId + ")");
@@ -51,7 +50,6 @@ public class DashboardController {
     
     @GetMapping("/manager/{managerId}")
     public String getDashboardPourManager(@PathVariable Integer managerId, Model model) {
-        // ... Ton code existant pour cette méthode
         var anomaliesEnAttente = anomalieRepository.findByManagerIdAndStatutWithEmploye(managerId, StatutAnomalie.EN_ATTENTE).stream().map(AnomalieMapper::toAnomalieDto).collect(Collectors.toList());
         var historiqueRecent = anomalieRepository.findByManagerIdAndStatutNotWithEmploye(managerId, StatutAnomalie.EN_ATTENTE).stream().map(AnomalieMapper::toAnomalieDto).collect(Collectors.toList());
         model.addAttribute("titre", "Mes Anomalies à Traiter");
@@ -61,9 +59,7 @@ public class DashboardController {
         return "dashboard";
     }
 
-    // ====================================================================
-    // === NOUVEL ENDPOINT AVEC LA BONNE LOGIQUE HIÉRARCHIQUE ===
-    // ====================================================================
+   
     
     @GetMapping("/manager/{managerId}/predictions")
     @ResponseBody
@@ -75,7 +71,7 @@ public class DashboardController {
             return ResponseEntity.ok(Collections.emptyList());
         }
         
-        // La logique correcte : trouver les employés par noeud
+        
         List<Employe> employesDuManager = employeRepository.findByNoeud(manager.getNoeud());
 
         LocalDate dateDebut = LocalDate.now();

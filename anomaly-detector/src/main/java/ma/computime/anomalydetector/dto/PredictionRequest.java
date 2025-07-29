@@ -23,6 +23,6 @@ public class PredictionRequest {
     @JsonProperty("semaine_de_annee")
     private int semaineDeAnnee;
     
-    @JsonProperty("badge") // <-- NOUVEAU CHAMP AJOUTÉ
+    @JsonProperty("badge") 
     private String badge;
 }

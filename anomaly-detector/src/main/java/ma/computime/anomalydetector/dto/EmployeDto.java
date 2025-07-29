@@ -1,4 +1,3 @@
-// FICHIER : EmployeDto.java (Nouveau Fichier)
 package ma.computime.anomalydetector.dto;
 
 import lombok.Data;
