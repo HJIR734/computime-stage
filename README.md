@@ -81,15 +81,15 @@ services:
 Cas d'usage :
  * Pour connecter à une base de données sur votre PC (localhost) : Utilisez le nom spécial host.docker.internal comme adresse du serveur.
 
-  ## DATABASE_URL: "jdbc:mysql://host.docker.internal:3306/ma_base_de_test"
+  DATABASE_URL: "jdbc:mysql://host.docker.internal:3306/ma_base_de_test"
 
  * Pour connecter à une base de données sur un serveur distant : Utilisez l'adresse IP ou le nom de domaine du serveur.
 
-  ## DATABASE_URL: "jdbc:mysql://192.168.1.100:3306/base_de_prod"
+  DATABASE_URL: "jdbc:mysql://192.168.1.100:3306/base_de_prod"
 
 
 Note technique : En fonction du profil activé, Spring Boot charge automatiquement la configuration depuis les fichiers application-default.properties (pour le développement local) ou application-docker.properties (pour l'environnement Docker).
----
+
 
 ##  Guide de Lancement Rapide
 
