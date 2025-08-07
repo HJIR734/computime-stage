@@ -146,4 +146,6 @@ Une fois l'application lancée, vous pouvez interagir avec elle via un client AP
 **Interface de démonstration** :
 Tableau de bord Manager : http://localhost:8080/dashboard/manager/{id_manager}
 
+![Schéma d'Architecture](./docs/images/interface.png)
+
 *(Remplacez `{date}` par une date au format `YYYY-MM-DD`)*.
