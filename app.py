@@ -42,7 +42,7 @@ load_model_and_explainer('compensation', './models/model_compensation.pkl')
 load_model_and_explainer('absence_injustifiee', './models/model_absence_injustifiee.pkl')
 
 # ====================================================================
-# NOUVEAU : Chargement du modèle de prédiction d'absence future
+#  Chargement du modèle de prédiction d'absence future
 # ====================================================================
 load_model_and_explainer('absence_predictor', './models/absence_predictor_model.pkl')
 
@@ -65,11 +65,10 @@ def get_shap_based_justification(explainer, input_df, feature_names):
     feature_impacts = pd.Series(feature_impacts_values, index=feature_names).sort_values(ascending=False)
     return feature_impacts.head(2).index.tolist()
 
-# --- Tous les endpoints existants (inchangés) ---
+
 
 @app.route('/predict/entree', methods=['POST'])
 def predict_entree():
-    # ... (ton code existant, inchangé)
     if 'omission' not in models: return jsonify({'erreur': "Modèle omission non disponible."}), 503
     data = request.get_json()
     features_df = pd.DataFrame([data])
@@ -78,8 +77,7 @@ def predict_entree():
     heure_predite = f"{int(prediction_secondes / 3600):02d}:{int((prediction_secondes % 3600) / 60):02d}"
     return jsonify({'suggestion_heure': heure_predite})
 
-# ... (tous tes autres endpoints : /overtime-context, /retard-context, etc. restent ici, inchangés)
-# Dans app.py
+
 
 @app.route('/predict/overtime-context', methods=['POST'])
 def predict_overtime_context():
@@ -89,14 +87,11 @@ def predict_overtime_context():
 
     data = request.get_json()
 
-    # ====================== DÉBUT DE LA MODIFICATION ======================
+    
 
     # Étape 1 : Extraire notre nouvelle feature du JSON reçu
     mode_compensation_prefere = data.get('mode_compensation_prefere', 'PAYE') # 'PAYE' par défaut
 
-    # Préparer les données pour le modèle en s'assurant que toutes les features attendues sont là
-    # Le modèle actuel ne connaît pas 'mode_compensation_prefere', donc on ne le met pas dans 'input_df' pour l'instant.
-    # On va juste l'utiliser pour notre logique de décision.
     input_df = pd.DataFrame([data], columns=expected_features[model_name])
 
     # Étape 2 : Faire la prédiction comme avant
@@ -117,8 +112,8 @@ def predict_overtime_context():
         else: # Si c'est "PAYE" ou une autre valeur
             final_decision = "ACCEPTER ET PAYER"
 
-    # Étape 4 : Récupérer la justification comme avant
-    # ====================== DÉBUT DE LA MODIFICATION ======================
+    # Étape 4 : Récupérer la justification 
+    
     
     # Étape 1 : Obtenir les features techniques importantes comme avant
     justification_features_techniques = get_shap_based_justification(explainers[model_name], input_df, expected_features[model_name])
@@ -149,12 +144,12 @@ def predict_overtime_context():
     if not justification_humaine:
         justification_humaine.append("Suggestion basée sur l'analyse générale des données.")
 
-    # ======================= FIN DE LA MODIFICATION =======================
+    
     
     
     
     return jsonify({
-        "decision": final_decision, # On renvoie notre décision affinée
+        "decision": final_decision, 
         "confiance": f"{confiance:.0%}", 
         "justification": justification_humaine
     })
@@ -178,7 +173,7 @@ def predict_retard_context():
     if not justification: justification.append("Analyse standard.")
     return jsonify({"decision": decision, "confiance": f"{confiance:.0%}", "justification": justification})
 
-# Dans app.py
+
 
 @app.route('/predict/sortie-anticipee-context', methods=['POST'])
 def predict_sortie_anticipee_context():
@@ -190,23 +185,21 @@ def predict_sortie_anticipee_context():
     features = expected_features[model_name]
     input_df = pd.DataFrame([data], columns=features)
     
-    # --- Prédiction (inchangée) ---
+    
     model = models[model_name]
     prediction_proba = model.predict_proba(input_df)[0]
     decision_index = np.argmax(prediction_proba)
     decision = "TOLÉRER" if model.classes_[decision_index] == 1 else "JUSTIFICATION REQUISE"
     confiance = prediction_proba[decision_index]
     
-    # ====================== DÉBUT DE LA MODIFICATION ======================
     
-    # Étape 1 : Obtenir les features techniques importantes du modèle
     explainer = explainers[model_name]
     justification_features_techniques = get_shap_based_justification(explainer, input_df, features)
     
-    # Étape 2 : Traduire ces features en phrases humaines
+    
     justification_humaine = []
     for feature in justification_features_techniques:
-        valeur = data.get(feature, 0) # Obtenir la valeur de la feature
+        valeur = data.get(feature, 0) 
         
         if feature == 'duree_anticipation_minutes':
             if valeur > 30:
@@ -219,24 +212,24 @@ def predict_sortie_anticipee_context():
                 justification_humaine.append("Le fait que ce soit en fin de semaine a été pris en compte.")
         
         elif feature == 'nb_hs_recentes_heures':
-            if valeur > 4: # Si l'employé a fait plus de 4h sup récemment
+            if valeur > 4: 
                 justification_humaine.append("L'employé a récemment effectué des heures supplémentaires.")
             else:
                 justification_humaine.append("L'historique des heures supplémentaires a été vérifié.")
                 
         elif feature == 'charge_travail_jour':
-            if valeur > 0.8: # Si la charge de travail était élevée
+            if valeur > 0.8: 
                 justification_humaine.append("La charge de travail de la journée a été un facteur.")
             
     if not justification_humaine:
         justification_humaine.append("Suggestion basée sur l'analyse générale des données.")
 
-    # ======================= FIN DE LA MODIFICATION =======================
+    
     
     return jsonify({
         "decision": decision, 
         "confiance": f"{confiance:.0%}", 
-        "justification": justification_humaine # <-- On renvoie la liste de phrases
+        "justification": justification_humaine 
     })
 @app.route('/predict/compensation', methods=['POST'])
 def predict_compensation():
@@ -309,7 +302,7 @@ def predict_absence_injustifiee():
 
 
 # ====================================================================
-# NOUVEL ENDPOINT POUR LA PRÉDICTION D'ABSENCE FUTURE
+#                LA PRÉDICTION D'ABSENCE FUTURE
 # ====================================================================
 @app.route('/predict/absence-future', methods=['POST'])
 def predict_absence_future():

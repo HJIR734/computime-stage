@@ -51,36 +51,52 @@ Pour lancer ce projet, vous n'avez besoin que des outils suivants installés sur
 
 *   [**Git**](https://git-scm.com/)
 *   [**Docker Desktop**](https://www.docker.com/products/docker-desktop/)
-*   [**MySQL Server**](https://dev.mysql.com/downloads/mysql/) (ou tout autre serveur MySQL accessible)
 
-*Note : Il n'est PAS nécessaire d'installer Java, Maven ou Python sur la machine hôte. Docker s'occupe de tout.*
+*Note : Il n'est PAS nécessaire d'installer Java, Maven ou Python ou même MySQL sur la machine hôte. Docker s'occupe de tout.*
 
 ---
 
 ## Configuration Cruciale
-Avant de lancer le projet, vous devez configurer la connexion à la base de données.
-À la racine du projet, trouvez le fichier **src/main/resources/application-docker.properties**.
-Modifiez les lignes suivantes avec vos informations de connexion MySQL :
+La connexion à la base de données se configure **entièrement** dans le fichier `docker-compose.yml`. C'est le seul fichier que vous devez modifier pour adapter le projet à votre environnement.
 
- * Remplacez "mysql-server" par "host.docker.internal" si votre DB tourne sur votre machine hôte Windows/Mac.
-  spring.datasource.url=jdbc:mysql://mysql-server:3306/sicda_easytime
-  spring.datasource.username=root
- * METTEZ VOTRE MOT DE PASSE MYSQL ICI
-  spring.datasource.password=votre_mot_de_passe_ici
+Ouvrez le fichier `docker-compose.yml` et éditez les variables d'environnement du service `java-app`:
+
+```yaml
+# Extrait de docker-compose.yml
+services:
+  java-app:
+    # ...
+    environment:
+      SPRING_PROFILES_ACTIVE: "docker"
+
+      # --- MODIFIEZ LES 3 LIGNES SUIVANTES ---
+      DATABASE_URL: "jdbc:mysql://[ADRESSE_SERVEUR_DB]:3306/[NOM_BASE]"
+      DATABASE_USER: "[VOTRE_USER]"
+      DATABASE_PASS: "[VOTRE_MOT_DE_PASSE]"
+      # ----------------------------------------
+      
+      IA_API_BASE_URL: "http://python-ai:5001"
+
+```
+Cas d'usage :
+ * Pour connecter à une base de données sur votre PC (localhost) : Utilisez le nom spécial host.docker.internal comme adresse du serveur.
+
+  ## DATABASE_URL: "jdbc:mysql://host.docker.internal:3306/ma_base_de_test"
+
+ * Pour connecter à une base de données sur un serveur distant : Utilisez l'adresse IP ou le nom de domaine du serveur.
+
+  ## DATABASE_URL: "jdbc:mysql://192.168.1.100:3306/base_de_prod"
 
 
+Note technique : En fonction du profil activé, Spring Boot charge automatiquement la configuration depuis les fichiers application-default.properties (pour le développement local) ou application-docker.properties (pour l'environnement Docker).
 ---
+
 ##  Guide de Lancement Rapide
 
-Lancer l'intégralité de l'écosystème se fait en 3 étapes simples.
+Lancer l'intégralité de l'écosystème se fait en 2 étapes simples.
 
-### 1. Base de Données
 
-1.  Assurez-vous que votre serveur MySQL est démarré.
-2.  Créez une base de données (schema) nommée `sicda_easytime`.
-3.  Importez les scripts SQL fournis pour créer les tables et insérer les données.
-
-### 2. Récupération du Projet
+### 1. Récupération du Projet
 
 Clonez ce dépôt sur votre machine locale :
 ```bash
@@ -88,7 +104,7 @@ git clone [URL_DE_VOTRE_DEPOT_GITHUB]
 cd anomaly-detector
 ```
 
-### 3. Lancement avec Docker Compose
+### 2. Lancement avec Docker Compose
 
 Depuis la racine du projet, lancez la commande suivante. **C'est la seule commande dont vous avez besoin.**
 

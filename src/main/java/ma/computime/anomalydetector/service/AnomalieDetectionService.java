@@ -51,10 +51,7 @@ public class AnomalieDetectionService {
     
 
 
-// Dans AnomalieDetectionService.java
 
-// Emplacement: AnomalieDetectionService.java
-// REMPLACE CETTE MÉTHODE ENTIÈREMENT (Version Finale)
 
 @Transactional
 public void lancerDetectionPourTous(LocalDate jour) {
@@ -72,13 +69,11 @@ public void lancerDetectionPourTous(LocalDate jour) {
          .sorted(Comparator.comparing(Pointage::getDateMouvement))
          .collect(Collectors.toList());
 
-        // Si aucun pointage, on ne peut pas détecter d'omission. On passera à la détection d'absence plus tard.
+        
         if (pointagesDuJour.isEmpty()) {
-             // La logique d'absence sera gérée plus bas
+             
         } else {
-             // =========================================================================
-             // === NOUVELLE LOGIQUE DE DÉTECTION D'OMISSION (PLUS INTELLIGENTE) ===
-             // =========================================================================
+             
             if (pointagesDuJour.size() % 2 != 0) {
                 // On a un nombre impair de pointages. Est-ce une VRAIE omission ?
                 
@@ -107,11 +102,9 @@ public void lancerDetectionPourTous(LocalDate jour) {
             }
         }
 
-        // =========================================================================
-        // === LE RESTE DE LA LOGIQUE RESTE INCHANGÉ ===
-        // =========================================================================
         
-        // On redéfinit planningActif ici pour être sûr.
+        
+        
         Planning planningActif = employe.getPlanning(); 
         Optional<PlanningException> exceptionOpt = planningExceptionRepository.findActiveExceptionForEmploye(employe, jour);
         if (exceptionOpt.isPresent() && exceptionOpt.get().getPlanning() != null) {
@@ -154,23 +147,10 @@ public void lancerDetectionPourTous(LocalDate jour) {
     logger.info("Détection des anomalies terminée pour le jour : {}", jour);
 }
     
-   // =================================================================================
-// MÉTHODE CENTRALE DE CRÉATION D'ANOMALIE (VERSION FINALE À COPIER)
-// =================================================================================
-// Dans AnomalieDetectionService.java
+ 
 
 // =================================================================================
-// MÉTHODE CENTRALE DE CRÉATION D'ANOMALIE (VERSION FINALE CORRIGÉE)
-// =================================================================================
-// Dans AnomalieDetectionService.java
-
-// ... (tous tes imports en haut)
-
-// =================================================================================
-// MÉTHODE POUR TROUVER LE MANAGER (VERSION FINALE ET SIMPLE)
-// =================================================================================
-// =================================================================================
-// MÉTHODE POUR TROUVER LE MANAGER (VERSION FINALE CORRIGÉE - À REMPLACER)
+//                        MÉTHODE POUR TROUVER LE MANAGER 
 // =================================================================================
 private Optional<Employe> trouverManagerPourEmploye(Employe employe) {
     // Étape 1: Vérifier si l'employé a un noeud.
@@ -201,11 +181,9 @@ private Optional<Employe> trouverManagerPourEmploye(Employe employe) {
 
 
 // =================================================================================
-// MÉTHODE POUR CRÉER L'ANOMALIE (VERSION FINALE ET SIMPLE)
+//                         MÉTHODE POUR CRÉER L'ANOMALIE 
 // =================================================================================
-// =================================================================================
-// MÉTHODE POUR CRÉER L'ANOMALIE (VERSION FINALE ET SIMPLE - À REMPLACER)
-// =================================================================================
+
 private void creerEtSauverAnomalie(Employe employe, LocalDate jour, TypeAnomalie type, String message, String suggestion, LocalTime valeurSuggestion, Long dureeEnMinutes, Optional<Employe> managerOpt) {
     if (anomalieRepository.existsByEmployeAndJourAnomalieAndTypeAnomalie(employe, jour, type)) {
         logger.warn("DUPLICATA: Anomalie de type {} existe déjà pour l'employé {} le {}. Ignorée.", type, employe.getBadge(), jour);
@@ -214,7 +192,7 @@ private void creerEtSauverAnomalie(Employe employe, LocalDate jour, TypeAnomalie
 
     Anomalie anomalie = new Anomalie();
     anomalie.setEmploye(employe);
-    anomalie.setNoeudConcerne(employe.getNoeud()); // C'est une bonne pratique de garder le noeud de l'employé
+    anomalie.setNoeudConcerne(employe.getNoeud()); 
     anomalie.setJourAnomalie(jour);
     anomalie.setTypeAnomalie(type);
     anomalie.setMessage(message);
@@ -243,11 +221,10 @@ private void creerEtSauverAnomalie(Employe employe, LocalDate jour, TypeAnomalie
 
 
     // =================================================================================
-    // MÉTHODES DE DÉTECTION SPÉCIFIQUES (CORRIGÉES ET COHÉRENTES)
+    //                   MÉTHODES DE DÉTECTION SPÉCIFIQUES 
     // =================================================================================
 
-    // DANS AnomalieDetectionService.java
-// REMPLACE toute ta méthode detecterTravailJourNonTravaille par celle-ci.
+    
 
 private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour, List<Pointage> pointages, Planning planning, Optional<Employe> managerOpt) {
     if (pointages.isEmpty()) return false;
@@ -267,7 +244,7 @@ private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour,
     
     if (typeJourNonTravaille != null && typeAnomalie != null) {
         
-        // ======================== NOUVELLE LOGIQUE ========================
+        
         // Avant de créer une anomalie, on vérifie si ce travail est une récupération planifiée.
         boolean estUneRecuperationValidee = recuperationRepository.existsByEmployeAndDateRecuperationAndStatutValidee(employe, jour);
         
@@ -275,7 +252,7 @@ private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour,
             logger.info("Travail le {} détecté pour l'employé {}, mais il s'agit d'une récupération validée. Aucune anomalie générée.", jour, employe.getBadge());
             return true; // On retourne true pour indiquer que le "cas" a été traité et qu'il ne faut pas continuer.
         }  
-        // ====================== FIN DE LA NOUVELLE LOGIQUE ======================
+        
 
 
         if (pointages.size() < 2) {
@@ -301,39 +278,26 @@ private boolean detecterTravailJourNonTravaille(Employe employe, LocalDate jour,
     return false;
 }
 
-    // Dans AnomalieDetectionService.java
-
-// Dans AnomalieDetectionService.java
-
-// DANS AnomalieDetectionService.java
-// REMPLACE toute ta méthode detecterAbsenceInjustifiee par celle-ci.
-
-// DANS AnomalieDetectionService.java
-// REMPLACE la méthode detecterAbsenceInjustifiee par cette version finale.
+    
 
 private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour, Planning planning, Optional<Employe> managerOpt) {
     boolean devaitTravailler = planning != null && planning.getHorairePourJour(jour.getDayOfWeek()).isPresent();
     
     if (devaitTravailler) {
 
-        // ======================== VERSION FINALE DE LA LOGIQUE ========================
+        
         // On vérifie si l'absence est justifiée SOIT par une demande d'absence, SOIT par un congé.
         boolean estUneAbsenceValidee = absenceRepository.existsByEmployeAndJourCouvertAndStatutValidee(employe, jour);
         boolean estUnCongeValide = congeRepository.existsByEmployeAndJourCouvertAndStatutValidee(employe, jour);
 
-        if (estUneAbsenceValidee || estUnCongeValide) { // <-- LA MODIFICATION EST ICI (||)
+        if (estUneAbsenceValidee || estUnCongeValide) { 
             String justification = estUneAbsenceValidee ? "une demande d'absence" : "un congé";
             logger.info("Absence le {} détectée pour l'employé {}, mais elle est couverte par {}. Aucune anomalie générée.", jour, employe.getBadge(), justification);
             return; 
         }
-        // ====================== FIN DE LA LOGIQUE FINALE ======================
+     
 
-        // Si on arrive ici, l'absence n'est justifiée NI par une absence, NI par un congé.
-        // On continue le processus de création d'anomalie.
-        
-        // ... (le reste du code avec l'appel à l'IA ne change pas)
-        // DANS la méthode detecterAbsenceInjustifiee de AnomalieDetectionService.java
-        // REMPLACE ton ancien bloc Map<String, Object>... par celui-ci
+    
 
         Map<String, Object> context = new HashMap<>();
 
@@ -351,15 +315,9 @@ private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour, Plannin
         boolean estAdjacentWeekend = jour.getDayOfWeek() == DayOfWeek.MONDAY || jour.getDayOfWeek() == DayOfWeek.FRIDAY;
         boolean estAdjacentFerie = jourFerieRepository.existsByDate(jour.minusDays(1)) || jourFerieRepository.existsByDate(jour.plusDays(1));
         context.put("est_adjacent_weekend_ferie", (estAdjacentWeekend || estAdjacentFerie) ? 1 : 0);
-        context.put("charge_equipe", 0.7); // On garde une valeur fixe pour l'instant
-
-        // ==============================================================================
-        // NOUVELLE FEATURE AJOUTÉE
-        // ==============================================================================
+        context.put("charge_equipe", 0.7); 
         long nbAbsences90Jours = absenceRepository.countRecentValidatedAbsences(employe, jour.minusDays(90).atStartOfDay(), jour.atStartOfDay());
         context.put("nb_absences_90_derniers_jours", nbAbsences90Jours);
-        // ==============================================================================
-
         String suggestionTexte = callIaService("/predict/absence-injustifiee", context, "prédiction d'absence");
         String message = "Aucun pointage détecté pour une journée de travail planifiée.";
         creerEtSauverAnomalie(employe, jour, TypeAnomalie.ABSENCE_INJUSTIFIEE, message, suggestionTexte, null, null, managerOpt);
@@ -389,9 +347,9 @@ private void detecterAbsenceInjustifiee(Employe employe, LocalDate jour, Plannin
         }
     }
 
-    // =================================================================================
-// MÉTHODE DE DÉTECTION D'OMISSION (À REMPLACER)
-// =================================================================================
+     // =================================================================================
+     //                  MÉTHODE DE DÉTECTION D'OMISSION 
+     // =================================================================================
 private void detecterOmissionAvecIA(Employe employe, LocalDate jour, Optional<Employe> managerOpt) {
     String message = "Nombre de pointages impair détecté.";
     LocalTime suggestionHeure = null;
@@ -412,9 +370,7 @@ private void detecterOmissionAvecIA(Employe employe, LocalDate jour, Optional<Em
     } catch (Exception e) {
         suggestionTexte = "Suggestion non disponible (IA injoignable)";
     }
-    // ========================================================================
-    // CORRECTION SYNTAXE : On ajoute 'managerOpt' à la fin de l'appel
-    // ========================================================================
+    
     creerEtSauverAnomalie(employe, jour, TypeAnomalie.OMISSION_POINTAGE, message, suggestionTexte, suggestionHeure, null, managerOpt);
 }
     
@@ -434,7 +390,7 @@ private void detecterOmissionAvecIA(Employe employe, LocalDate jour, Optional<Em
         }
     }
 
-    // Dans AnomalieDetectionService.java
+   
 
 private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, List<Pointage> pointages, Horaire horaire, Optional<Employe> managerOpt) {
     if (pointages.size() < 2) return;
@@ -454,22 +410,21 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
             return;
         }
 
-        // ====================== DÉBUT DE LA MODIFICATION ======================
+        
 
         // Étape 1 : Récupérer le mode de compensation préféré de l'employé depuis son planning.
-        String modeCompensationPrefere = "PAYE"; // Valeur par défaut si rien n'est défini.
+        String modeCompensationPrefere = "PAYE"; 
         
         // On vérifie que l'employé a un planning et que ce planning a une catégorie HS définie.
         if (employe.getPlanning() != null && employe.getPlanning().getCategorieHeureSup() != null) {
             
-            // Hypothèse basée sur tes données : 1 = COMPENSE, 0 (ou autre) = PAYE.
+            
             if (employe.getPlanning().getCategorieHeureSup() == 1) {
                 modeCompensationPrefere = "COMPENSE";
             }
         }
 
-        // Étape 2 : Créer le corps de la requête pour l'IA en y ajoutant notre nouvelle information.
-        // On ne peut plus utiliser Map.of() car il est immuable. On passe à HashMap.
+        
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("badge", employe.getBadge());
         requestBody.put("hs_minutes", hsMinutes);
@@ -478,10 +433,10 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
         long hsPasseesValidees = anomalieRepository.countByEmployeAndTypeAnomalieAndStatut(employe, TypeAnomalie.HEURE_SUP_NON_AUTORISEE, StatutAnomalie.VALIDEE);
         requestBody.put("nb_hs_validees_historique", hsPasseesValidees);
         
-        // On ajoute la nouvelle feature !
+        
         requestBody.put("mode_compensation_prefere", modeCompensationPrefere);
         
-        // ======================= FIN DE LA MODIFICATION =======================
+        
 
         String suggestionTexte = callIaService("/predict/overtime-context", requestBody, "prédiction d'heures sup");
         String message = String.format("Heure supplémentaire de %d minutes détectée.", hsMinutes);
@@ -505,20 +460,20 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
 
     public double getAbsencePrediction(LocalDate jour, Employe employe) {
     
-    // 1. Préparer les features, exactement comme dans le notebook Python
+    
     Map<String, Object> requestBody = new HashMap<>();
     
-    // Features temporelles
+    
     requestBody.put("jour_semaine", jour.getDayOfWeek().getValue() - 1); // Python: 0=Lundi, Java: 1=Lundi. On ajuste.
     requestBody.put("jour_mois", jour.getDayOfMonth());
     requestBody.put("mois", jour.getMonthValue());
     requestBody.put("semaine_annee", jour.get(WeekFields.of(Locale.FRANCE).weekOfWeekBasedYear()));
 
-    // Features de l'employé
+    
     requestBody.put("profil_metier_id", employe.getProfilMetier() != null ? employe.getProfilMetier().getId() : 0);
     requestBody.put("noeud_id", employe.getNoeud() != null ? employe.getNoeud().getId() : 0);
 
-    // Features de jours spéciaux
+    
     boolean estFerie = jourFerieRepository.existsByDate(jour);
     requestBody.put("est_ferie", estFerie ? 1 : 0);
     requestBody.put("veille_ferie", jourFerieRepository.existsByDate(jour.plusDays(1)) ? 1 : 0);
@@ -527,7 +482,7 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
     try {
         // 2. Appeler l'API Flask
         PredictionAbsenceResponse response = restClient.post()
-                .uri("/predict/absence-future") // Le nouvel endpoint
+                .uri("/predict/absence-future") 
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(requestBody)
                 .retrieve()
@@ -540,7 +495,7 @@ private void detecterHeureSupplementaireAvecIA(Employe employe, LocalDate jour, 
         logger.error("Erreur lors de l'appel à l'API de prédiction d'absence: {}", e.getMessage());
     }
 
-    // En cas d'erreur, on renvoie une probabilité très basse
-    return -1.0; // On renvoie -1 pour signifier une erreur, c'est mieux que 0.0
+    
+    return -1.0; 
 }
 }

@@ -14,21 +14,21 @@ import java.util.List;
 
 public interface AnomalieRepository extends JpaRepository<Anomalie, Long> {
 
-    // === REQUÊTES OPTIMISÉES POUR LE DASHBOARD MANAGER ===
+    
     @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.managerResponsable.id = :managerId AND a.statut = :statut")
     List<Anomalie> findByManagerIdAndStatutWithEmploye(Integer managerId, StatutAnomalie statut);
     
     @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.managerResponsable.id = :managerId AND a.statut <> :statut")
     List<Anomalie> findByManagerIdAndStatutNotWithEmploye(Integer managerId, StatutAnomalie statut);
 
-    // === REQUÊTES OPTIMISÉES POUR LE DASHBOARD NOEUD ===
+   
     @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.noeudConcerne.id = :noeudId AND a.statut = :statut")
     List<Anomalie> findByNoeudIdAndStatutWithEmploye(Integer noeudId, StatutAnomalie statut);
 
     @Query("SELECT a FROM Anomalie a JOIN FETCH a.employe WHERE a.noeudConcerne.id = :noeudId AND a.statut <> :statut")
     List<Anomalie> findByNoeudIdAndStatutNotWithEmploye(Integer noeudId, StatutAnomalie statut);
 
-    // === AUTRES MÉTHODES UTILES CONSERVÉES ===
+    
     long countByManagerResponsableIdAndStatut(Integer managerId, StatutAnomalie statut);
     
     boolean existsByEmployeAndJourAnomalieAndTypeAnomalie(Employe employe, LocalDate jourAnomalie, TypeAnomalie typeAnomalie);

@@ -30,13 +30,13 @@ public class TachesPlanifiees {
      */
     @Scheduled(cron = "0 0 2 * * ?")
     public void lancerDetectionQuotidienne() {
-        // On prend la date de la veille
+        
         LocalDate jourADetecter = LocalDate.now().minusDays(1);
         
         logger.info("--- [SCHEDULER] : Lancement de la tâche de détection automatique pour la journée du {} ---", jourADetecter);
         
         try {
-            // On appelle la même méthode que notre contrôleur manuel
+            
             anomalieDetectionService.lancerDetectionPourTous(jourADetecter);
             logger.info("--- [SCHEDULER] : Tâche de détection automatique terminée avec succès pour le {} ---", jourADetecter);
         } catch (Exception e) {

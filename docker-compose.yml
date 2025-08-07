@@ -1,23 +1,37 @@
-
+version: '3.8'
 
 services:
   # Service N°1 : Notre application Java (le détecteur d'anomalies)
   java-app:
-    build: . # Construit l'image en utilisant le Dockerfile du dossier courant
+    build: . # Construit l'image en utilisant le Dockerfile à la racine du projet
     container_name: anom-detector-java
     ports:
-      - "8080:8080" # Connecte le port 8080 du PC au port 8080 du conteneur
+      - "8080:8080" # Connecte le port 8080 de ton PC au port 8080 du conteneur
     environment:
-      # On passe les variables d'environnement pour qu'il utilise le profil docker
-      - SPRING_PROFILES_ACTIVE=docker
+      # Active le profil "docker" dans le fichier application.properties
+      SPRING_PROFILES_ACTIVE: "docker"
+
+      # --- CONFIGURATION EXTERNALISÉE POUR LA BASE DE DONNÉES ---
+      # C'est ici que l'utilisateur (ton encadrant) doit mettre ses informations.
+      # Remplacez les valeurs ci-dessous par celles de la base de données cible.
+      # Note : Si la DB tourne sur le PC hôte, utiliser "host.docker.internal" comme adresse.
+      DATABASE_URL: "jdbc:mysql://host.docker.internal:3306/sicda_easytime"
+      DATABASE_USER: "root"
+      DATABASE_PASS: "root" # Change par ton vrai mot de passe si différent
+
+      # --- CONFIGURATION POUR LA COMMUNICATION INTER-CONTENEURS ---
+      # L'application Java utilisera cette URL pour parler au service Python.
+      # 'python-ai' est le nom du service défini plus bas.
+      IA_API_BASE_URL: "http://python-ai:5001"
+      
     depends_on:
       - python-ai # Attend que le service python démarre avant de se lancer
 
   # Service N°2 : Notre service d'IA en Python
   python-ai:
     build:
-      context: . # Utilise le dossier courant comme contexte
-      dockerfile: Dockerfile.python # Utilise un Dockerfile spécifique pour Python
+      context: . # Le contexte de build est la racine du projet
+      dockerfile: Dockerfile.python # On spécifie le nom du Dockerfile pour Python
     container_name: anom-detector-python
     ports:
-      - "5001:5001" # Connecte le port 5001 du PC au port 5001 du conteneur
+      - "5001:5001" # Connecte le port 5001 de ton PC au port 5001 du conteneur

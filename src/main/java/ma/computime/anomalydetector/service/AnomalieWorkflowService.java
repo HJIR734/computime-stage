@@ -28,11 +28,7 @@ public class AnomalieWorkflowService {
     @Autowired
     private PointageRepository pointageRepository;
 
-    /**
-     * Valide une anomalie simple (qui ne nécessite pas de création de données), 
-     * en changeant son statut à VALIDEE.
-     * Ex: Valider un retard ou une sortie anticipée.
-     */
+    
     @Transactional
     public Optional<Anomalie> validerAnomalie(Long anomalieId, String commentaire) {
         logger.info("Tentative de validation de l'anomalie ID : {}", anomalieId);
@@ -55,9 +51,7 @@ public class AnomalieWorkflowService {
         return Optional.of(anomalieSauvegardee);
     }
 
-    /**
-     * Rejette une anomalie simple, en changeant son statut à REJETEE.
-     */
+    
     @Transactional
     public Optional<Anomalie> rejeterAnomalie(Long anomalieId, String commentaire) {
         logger.info("Tentative de rejet de l'anomalie ID : {}", anomalieId);
@@ -80,14 +74,7 @@ public class AnomalieWorkflowService {
         return Optional.of(anomalieSauvegardee);
     }
 
-    /**
-     * Corrige manuellement une anomalie d'omission en créant un nouveau pointage
-     * et en passant l'anomalie au statut RESOLUE.
-     * @param anomalieId L'ID de l'anomalie à corriger.
-     * @param heureCorrigeeStr L'heure du pointage manquant, au format "HH:mm".
-     * @param commentaire Le commentaire du manager.
-     * @return L'anomalie mise à jour.
-     */
+    
     @Transactional
     public Optional<Anomalie> corrigerManuellement(Long anomalieId, String heureCorrigeeStr, String commentaire) {
         logger.info("Tentative de correction manuelle pour l'anomalie ID {} avec l'heure {}", anomalieId, heureCorrigeeStr);
@@ -111,7 +98,7 @@ public class AnomalieWorkflowService {
         }
 
         try {
-            // Étape 1 : Créer le nouveau pointage
+            
             LocalTime heureCorrigee = LocalTime.parse(heureCorrigeeStr);
             Pointage pointageCorrige = new Pointage();
             pointageCorrige.setBadgeEmploye(anomalie.getEmploye().getBadge());
@@ -119,7 +106,7 @@ public class AnomalieWorkflowService {
             pointageCorrige.setCodePointeuse("CORR_MANUELLE_MANAGER");
             pointageRepository.save(pointageCorrige);
 
-            // Étape 2 : Mettre à jour l'anomalie
+            
             anomalie.setStatut(StatutAnomalie.RESOLUE);
             anomalie.setCommentaireValidation("Correction manuelle par manager : " + commentaire);
             anomalie.setDateResolution(LocalDateTime.now());

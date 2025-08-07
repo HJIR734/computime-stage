@@ -13,13 +13,6 @@ import java.time.LocalDateTime;
 
 public interface AbsenceRepository extends JpaRepository<Absence, Integer> {
 
-    /**
-     * Vérifie s'il existe une absence VALIDEE pour un employé qui couvre un jour donné.
-     *
-     * @param employe L'employé concerné.
-     * @param jour Le jour à vérifier.
-     * @return true si une absence validée couvre ce jour, false sinon.
-     */
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END " +
            "FROM Absence a " +
            "WHERE a.employe = :employe " +
